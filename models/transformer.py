@@ -1,5 +1,4 @@
-import copy
-from typing import Optional, List
+from typing import Optional
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
@@ -232,7 +231,7 @@ class Transformer_Encoder(nn.Module):
 
 class Transformer_Decoder(nn.Module):
     def __init__(self, num_layers, norm=None, d_model=512, nhead=8, dim_feedforward=2048,
-                 dropout=0.1, drop_path=0.4, activation="relu", normalize_before=False):
+                 dropout=0.1, drop_path=0.4, activation="relu", normalize_before=True):
         super(Transformer_Decoder, self).__init__()
         self.num_layers = num_layers
         self.norm = norm
