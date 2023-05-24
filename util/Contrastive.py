@@ -30,23 +30,41 @@ class ContrastiveLoss(nn.Module):
     Based on: Representation Learning with Contrastive Predictive Coding
     (CPC) https://arxiv.org/pdf/1807.03748.pdf
     """
-    def __init__(self, temperature=0.07):
+    def __init__(self, time_step_weights: list = None):
         super(ContrastiveLoss, self).__init__()
-        self.temperature = temperature
+        assert time_step_weights is not None, "time_step_weights should be a list"
+        self.weights = torch.tensor(time_step_weights)
+        self.lsoftmax = nn.LogSoftmax(dim=-1)
     
-    def forward(self, similarity_mtx: Tensor):
+    def forward(self, pred: Tensor, targets: Tensor, model: nn.Module):
         """
-        Calculate the contrastive loss.
-        :param similarity_mtx: Tensor [B, B],
-        B is the batch size
+        Calculate the infoNCE loss.
+        :param pred: Tensor [time_step, B, embed_dim]
+        :param targets: Tensor [B, time_step, in_dim], in_dim is the temporal dimension
+        :param model: nn.Module, the encoder and regressor model
         :return: Tensor
         """
-        b = similarity_mtx.shape[0]
+        b, l, t_d = targets.shape
+        device = targets.device
+
+        assert pred.shape == (l, b, model.embed_dim), \
+            "pred shape should be [time_step, B, embed_dim]"
+        assert t_d == model.AutoEncoder_cfg["in_dim"], \
+            "Input temporal dimension should be the same as the in_dim in AutoEncoder"
+        assert len(self.weights) == l, "time_step_weights length should be the same as time_step"
         
-        # Calculate the similarity between each pair of samples
-        similarity_mtx = torch.exp(similarity_mtx / self.temperature)
-        
+        # Calculate the true futures (targets) encoded features (embed vectors)
+        # encoded_targets: [B, time_step, embed_dim]
+        with torch.no_grad():
+            encoded_targets = torch.as_tensor([self.encoder(targets[i, :, :].unsqueeze(1) 
+                                                            for i in range(b))]).to(device)
+            encoded_targets = encoded_targets.permute(1, 0, 2).contiguous()
+
         # Calculate the loss
-        loss = (-torch.log(similarity_mtx / similarity_mtx.sum(dim=1, keepdim=True))).sum() / b
-        
-        return loss
+        # pred: [time_step, B, embed_dim]; encoded_targets: [time_step, B, embed_dim]
+        # mutural_info: [time_step, B, B]
+        mutural_info = torch.matmul(encoded_targets, torch.transpose(pred, 1, 2))
+        NCELoss = -torch.sum(torch.diagonal(self.lsoftmax(mutural_info), dim1=-2, dim2=-1) * self.weights)
+        NCELoss /= l * b
+
+        return NCELoss

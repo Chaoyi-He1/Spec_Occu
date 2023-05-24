@@ -13,6 +13,7 @@ in the latent space and produces a context latent representation c_t = g(z ≤ t
 Autoregressive model is composed of Transformer encoder and conv1d layer for downsampling.
 """
 from typing import Optional
+import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 
@@ -79,6 +80,12 @@ class Conv1d_AutoEncoder(nn.Module):
                 self.embed_dim //= 2
         
         self.avgpool = nn.AdaptiveAvgPool1d(1)
+        self._reset_parameters()
+    
+    def _reset_parameters(self):
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
 
     def forward(self, inputs: Tensor) -> Tensor:
         # inputs: [B, 1, in_dim], 
@@ -178,7 +185,7 @@ class Autoregressive(nn.Module):
 
 
 class Encoder_Regressor(nn.Module):
-    def __init__(self, cfg: dict = None, ) -> None:
+    def __init__(self, cfg: dict = None, timestep: int = 12) -> None:
         super(Encoder_Regressor, self).__init__()
         assert cfg is not None, "cfg should be a dict"
         self.AutoEncoder_cfg = {
@@ -200,8 +207,25 @@ class Encoder_Regressor(nn.Module):
         }
         self.regressor = Autoregressive(**self.AutoRegressive_cfg)
 
+        self.timestep = timestep
+        self.feature_dim = cfg["feature_dim"]
+        self.linear_trans  = nn.parameter.Parameter(torch.randn(self.timestep, self.embed_dim, self.feature_dim))
+
     def forward(self, inputs: Tensor) -> Tensor:
         # inputs: [B, L, in_dim]; 
         # B is the batch size; L is the sequence length, in_dim is the input temporal dimension
         # output: [B, feature_dim]
-        pass
+        b, l, t_d = inputs.shape
+        device = inputs.device
+        assert t_d == self.AutoEncoder_cfg["in_dim"], \
+            "Input temporal dimension should be the same as the in_dim in AutoEncoder"
+        encoder_outputs = torch.as_tensor([self.encoder(inputs[i, :, :].unsqueeze(1) 
+                                                        for i in range(b))]).to(device)
+        assert encoder_outputs.shape == (b, self.embed_dim, l), \
+            "Encoder output shape should be [B, Embedding, L]"
+        
+        feature = self.regressor(encoder_outputs)   # [B, feature_dim]
+        # pred: [time_step, B, embed_dim, 1]
+        pred = torch.matmul(self.linear_trans.unsqueeze(1), feature.unsqueeze(2))
+        
+        return pred.squeeze(-1)
