@@ -1,15 +1,22 @@
 """
 Contrastive Model.
-Use Transformer Encoder to form a U shape network, similar to U2Net.
-But do not have the upsampling part since we want to decrease the dimension of the feature map.
-Between each 
+
+Autoencoder model and Autoregressive model for contrastive learning.
+Based on: Representation Learning with Contrastive Predictive Coding
+(CPC) https://arxiv.org/pdf/1807.03748.pdf
+
+Autoencoder model is used to extract features from the input data.
+Autoencoder model is composed of ResNet style 1d convolutional neural network.
+
+Autoregressive model is used to summarizes all z ≤ t
+in the latent space and produces a context latent representation c_t = g(z ≤ t).
+Autoregressive model is composed of Transformer encoder and conv1d layer for downsampling.
 """
 from typing import Optional
-import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 
-from .transformer import Transformer_Encoder, Transformer_Decoder
+from .transformer import Transformer_Encoder, Transformer_Decoder, DropPath
 
 
 def _get_activation_fn(activation):
@@ -20,14 +27,78 @@ def _get_activation_fn(activation):
         return F.gelu
     if activation == "glu":
         return F.glu
+    if activation == "sigmoid":
+        return F.sigmoid
+    if activation == "leaky_relu":
+        return F.leaky_relu
     raise RuntimeError(F"activation should be relu/gelu, not {activation}.")
 
 
-class Encoder_Conv1d_Act_block(nn.Module):
+class Conv1d_BN_Relu(nn.Sequential):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1):
+        super(Conv1d_BN_Relu, self).__init__(
+            nn.Conv1d(in_channels, out_channels, kernel_size, stride, padding, dilation),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+    
+    def forward(self, x: Tensor) -> Tensor:
+        return super(Conv1d_BN_Relu, self).forward(x)
+
+
+class ResBlock(nn.Module):
+    def __init__(self, in_channel: int, kernel_size: int = 3, drop_path_ratio: float = 0.4) -> None:
+        super(ResBlock, self).__init__()
+        self.conv1 = Conv1d_BN_Relu(in_channel, in_channel // 2, kernel_size=1)
+        self.conv2 = Conv1d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, padding=kernel_size // 2)
+        self.drop_path = DropPath(drop_path_ratio) if drop_path_ratio > 0 else nn.Identity()
+    
+    def forward(self, x: Tensor) -> Tensor:
+        return x + self.drop_path(self.conv2(self.conv1(x)))
+
+
+class Conv1d_AutoEncoder(nn.Module):
+    def __init__(self, in_dim: int = 512, drop_path: float = 0.4) -> None:
+        super(Conv1d_AutoEncoder, self).__init__()
+        self.embed_dim = in_dim
+        self.channel = 16
+        self.conv1 = Conv1d_BN_Relu(in_dim, self.channel, kernel_size=13, padding=13 // 2)
+        self.conv2 = Conv1d_BN_Relu(self.channel, self.channel * 2, kernel_size=13, stride=2, padding=11 // 2)
+        self.channel *= 2
+        self.embed_dim //= 2
+
+        self.ResNet = nn.ModuleList()
+        res_params = zip([1, 2, 8, 8, 4], [11, 9, 5, 5, 5]) # num_blocks, kernel_size
+        # final channels = 512; final embed_dim = in_dim // (2^5) = in_dim // 32
+        for i, (num_blocks, kernel_size) in enumerate(res_params):
+            self.ResNet.extend([ResBlock(self.channel, kernel_size, drop_path) for _ in range(num_blocks)])
+            if i != len(res_params) - 1:
+                self.ResNet.append(Conv1d_BN_Relu(self.channel, self.channel * 2, 
+                                                  kernel_size, stride=2, padding=kernel_size // 2))
+                self.channel *= 2
+                self.embed_dim //= 2
+        
+        self.avgpool = nn.AdaptiveAvgPool1d(1)
+
+    def forward(self, inputs: Tensor) -> Tensor:
+        # inputs: [B, 1, in_dim], 
+        # B is the sequence_length in the following Transformer based AutoRegressive model
+        # output: [B, Embedding], Embedding = 512
+        assert inputs.shape[1] == 1 and len(inputs.shape) == 3, "Input shape should be [B, 1, Embedding]"
+
+        x = self.conv1(inputs)
+        x = self.conv2(x)
+        for block in self.ResNet:
+            x = block(x)
+        x = self.avgpool(x)
+        return x.squeeze(-1)
+        
+
+class TransEncoder_Conv1d_Act_block(nn.Module):
     def __init__(self, num_layers=4, d_model=512, nhead=8, dim_feedforward=2048, dropout=0.1,
                  drop_path=0.4, activation="relu", normalize_before=True,
                  kernel=7, sequence_length=64):
-        super(Encoder_Conv1d_Act_block, self).__init__()
+        super(TransEncoder_Conv1d_Act_block, self).__init__()
 
         encoder_norm = nn.LayerNorm(d_model) if normalize_before else None
         self.encoder = Transformer_Encoder(num_layers=num_layers, norm=encoder_norm, d_model=d_model,
@@ -49,12 +120,12 @@ class Encoder_Conv1d_Act_block(nn.Module):
         return self.activation(x)
 
 
-class Contrastive_backbone(nn.Module):
-    def __init__(self, num_blocks=5, feature_dim=256,
+class Autoregressive(nn.Module):
+    def __init__(self, num_blocks=3, feature_dim=256,
                  num_layers=4, d_model=512, nhead=8, dim_feedforward=2048, dropout=0.1,
                  drop_path=0.4, activation="relu", normalize_before=True,
-                 kernel=7, sequence_length=64) -> None:
-        super(Contrastive_backbone, self).__init__()
+                 kernel=7, sequence_length=32) -> None:
+        super(Autoregressive, self).__init__()
         
         block_params = {
             "num_layers": num_layers,
@@ -71,7 +142,7 @@ class Contrastive_backbone(nn.Module):
 
         block_list = []
         for _ in range(num_blocks):
-            block_list.append(Encoder_Conv1d_Act_block(**block_params))
+            block_list.append(TransEncoder_Conv1d_Act_block(**block_params))
             block_params["sequence_length"] /= 2
             block_params["d_model"] /= 2
 
@@ -104,3 +175,33 @@ class Contrastive_backbone(nn.Module):
         src = self.feature_layer(src)
         src = self.norm(src)
         return src
+
+
+class Encoder_Regressor(nn.Module):
+    def __init__(self, cfg: dict = None, ) -> None:
+        super(Encoder_Regressor, self).__init__()
+        assert cfg is not None, "cfg should be a dict"
+        self.AutoEncoder_cfg = {
+            "in_dim": cfg["Temporal_dim"],
+            "drop_path": cfg["drop_path"],
+        }
+        self.encoder = Conv1d_AutoEncoder(**self.AutoEncoder_cfg)
+        self.embed_dim = self.encoder.channel
+
+        self.AutoRegressive_cfg = {
+            "num_blocks": cfg["num_blocks"],
+            "feature_dim": cfg["feature_dim"],
+            "num_layers": cfg["num_layers"],
+            "d_model": self.embed_dim,
+            "nhead": cfg["nhead"],
+            "dropout": cfg["dropout"],
+            "drop_path": cfg["drop_path"],
+            "sequence_length": cfg["sequence_length"],
+        }
+        self.regressor = Autoregressive(**self.AutoRegressive_cfg)
+
+    def forward(self, inputs: Tensor) -> Tensor:
+        # inputs: [B, L, in_dim]; 
+        # B is the batch size; L is the sequence length, in_dim is the input temporal dimension
+        # output: [B, feature_dim]
+        pass
