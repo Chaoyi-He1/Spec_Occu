@@ -1,9 +1,14 @@
 import torch
 import torch.nn as nn
-from util import *
+from util.misc import *
+from util.Contrastive import *
+from typing import Iterable
 
 
-def train_one_epoch(dataloader, model, criterion, optimizer, device, epoch, print_freq=10):
+def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
+                    data_loader: Iterable, optimizer: torch.optim.Optimizer,
+                    device: torch.device, epoch: int, accumulate: int, max_norm: float = 0,
+                    warmup=False, scaler=None):
     model.train()
     metric_logger = MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', SmoothedValue(window_size=1, fmt='{value:.6f}'))
