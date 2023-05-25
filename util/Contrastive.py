@@ -55,6 +55,7 @@ class ContrastiveLoss(nn.Module):
         
         # Calculate the true futures (targets) encoded features (embed vectors)
         # encoded_targets: [B, time_step, embed_dim]
+        # TODO: use torch.no_grad() or not?
         with torch.no_grad():
             encoded_targets = torch.as_tensor([self.encoder(targets[i, :, :].unsqueeze(1) 
                                                             for i in range(b))]).to(device)
