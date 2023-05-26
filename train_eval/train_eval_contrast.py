@@ -7,22 +7,23 @@ from typing import Iterable
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
-                    device: torch.device, epoch: int, accumulate: int, max_norm: float = 0,
-                    warmup=False, scaler=None):
+                    device: torch.device, epoch: int, max_norm: float = 0,
+                    scaler=None):
     model.train()
-    metric_logger = MetricLogger(delimiter="  ")
+    criterion.train()
+    metric_logger = MetricLogger(delimiter="; ")
     metric_logger.add_meter('lr', SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter('class_error', SmoothedValue(window_size=1, fmt='{value:.2f}'))
     header = 'Epoch: [{}]'.format(epoch)
     
-    for samples, targets in metric_logger.log_every(dataloader, print_freq, header):
-        samples = samples.to(device)
-        targets = targets.to(device)
-        outputs = model(samples)
-        loss = criterion(outputs, targets)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        metric_logger.update(loss=loss.item())
-        metric_logger.update(lr=optimizer.param_groups[0]["lr"])
-    
-    return metric_logger
+    for i, (past, future) in enumerate(metric_logger.log_every(data_loader, 10, header)):
+        past = past.to(device)
+        future = future.to(device)
+        
+        # Compute the output
+        with torch.cuda.amp.autocast(enabled=scaler is not None):
+            pred_embed = model(past)    #pred_embed: [time_step, B, feature_dim]
+            infoNCELoss, cls_pred = criterion(pred_embed, future)
+            
+        # reduce losses over all GPUs for logging purposes
+        infoNCELoss_reduced = reduce_loss(infoNCELoss)

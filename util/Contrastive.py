@@ -31,9 +31,11 @@ class ContrastiveLoss(nn.Module):
     (CPC) https://arxiv.org/pdf/1807.03748.pdf
     """
     def __init__(self, time_step_weights: list = None):
+        # time_step_weights: list, the weights for each time step loss
         super(ContrastiveLoss, self).__init__()
         assert time_step_weights is not None, "time_step_weights should be a list"
         self.weights = torch.tensor(time_step_weights)
+        self.softmax = nn.Softmax(dim=-1)
         self.lsoftmax = nn.LogSoftmax(dim=-1)
     
     def forward(self, pred: Tensor, targets: Tensor, model: nn.Module):
@@ -42,7 +44,9 @@ class ContrastiveLoss(nn.Module):
         :param pred: Tensor [time_step, B, embed_dim]
         :param targets: Tensor [B, time_step, in_dim], in_dim is the temporal dimension
         :param model: nn.Module, the encoder and regressor model
-        :return: Tensor
+
+        :return: NCELoss: Tensor, the infoNCE loss
+                 cls_prd: Tensor, the classification accuracy
         """
         b, l, t_d = targets.shape
         device = targets.device
@@ -67,5 +71,8 @@ class ContrastiveLoss(nn.Module):
         mutural_info = torch.matmul(encoded_targets, torch.transpose(pred, 1, 2))
         NCELoss = -torch.sum(torch.diagonal(self.lsoftmax(mutural_info), dim1=-2, dim2=-1) * self.weights)
         NCELoss /= l * b
+        cls_prd = torch.sum(torch.eq(torch.argmax(self.softmax(mutural_info), dim=1),
+                           torch.arange(b).unsqueeze(0).to(device)))
+        cls_prd /= l * b
 
-        return NCELoss
+        return NCELoss, cls_prd

@@ -149,6 +149,22 @@ def reduce_dict(input_dict, average=True):
     return reduced_dict
 
 
+def reduce_loss(loss, reduction='mean'):
+    reduction_enum = {
+        'none': dist.Reduction.NONE,
+        'mean': dist.Reduction.MEAN,
+        'sum': dist.Reduction.SUM
+    }[reduction]
+    world_size = get_world_size()
+    if world_size < 2:
+        return loss
+    with torch.no_grad():
+        dist.reduce(loss, dst=0, op=reduction_enum)
+        if reduction != 'none':
+            loss /= world_size
+    return loss
+
+
 class MetricLogger(object):
     def __init__(self, delimiter="\t"):
         self.meters = defaultdict(SmoothedValue)
@@ -257,21 +273,6 @@ def get_sha():
         pass
     message = f"sha: {sha}, status: {diff}, branch: {branch}"
     return message
-
-
-def collate_fn(batch):
-    batch = list(zip(*batch))
-    batch[0] = nested_tensor_from_tensor_list(batch[0])
-    return tuple(batch)
-
-
-def _max_by_axis(the_list):
-    # type: (List[List[int]]) -> List[int]
-    maxes = the_list[0]
-    for sublist in the_list[1:]:
-        for index, item in enumerate(sublist):
-            maxes[index] = max(maxes[index], item)
-    return maxes
 
 
 def setup_for_distributed(is_master):
