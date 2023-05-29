@@ -3,6 +3,7 @@ Misc functions, including distributed helpers.
 
 Mostly copy-paste from torchvision references.
 """
+import glob
 import os
 import subprocess
 import time
@@ -354,3 +355,13 @@ def torch_distributed_zero_first(local_rank: int):
     yield
     if local_rank == 0:
         torch.distributed.barrier()
+
+
+def check_file(file):
+    # Searches for file if not found locally
+    if os.path.isfile(file):
+        return file
+    else:
+        files = glob.glob('./**/' + file, recursive=True)  # find file
+        assert len(files), 'File Not Found: %s' % file  # assert file was found
+        return files[0]  # return first file if multiple found

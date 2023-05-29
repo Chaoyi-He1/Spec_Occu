@@ -18,6 +18,7 @@ import torch.nn.functional as F
 from torch import nn, Tensor
 
 from .transformer import Transformer_Encoder, Transformer_Decoder, DropPath
+from .positional_embedding import build_position_encoding
 
 
 def _get_activation_fn(activation):
@@ -88,9 +89,9 @@ class Conv1d_AutoEncoder(nn.Module):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, inputs: Tensor) -> Tensor:
-        # inputs: [B, 1, in_dim], 
-        # B is the sequence_length in the following Transformer based AutoRegressive model
-        # output: [B, Embedding], Embedding = 512
+        # inputs: [L, 1, in_dim], 
+        # L is the sequence_length in the following Transformer based AutoRegressive model
+        # output: [L, Embedding], Embedding = 512
         assert inputs.shape[1] == 1 and len(inputs.shape) == 3, "Input shape should be [B, 1, Embedding]"
 
         x = self.conv1(inputs)
@@ -185,7 +186,7 @@ class Autoregressive(nn.Module):
 
 
 class Encoder_Regressor(nn.Module):
-    def __init__(self, cfg: dict = None, timestep: int = 12) -> None:
+    def __init__(self, cfg: dict = None, timestep: int = 12, pos_type: str = "sine") -> None:
         super(Encoder_Regressor, self).__init__()
         assert cfg is not None, "cfg should be a dict"
         self.AutoEncoder_cfg = {
@@ -194,6 +195,8 @@ class Encoder_Regressor(nn.Module):
         }
         self.encoder = Conv1d_AutoEncoder(**self.AutoEncoder_cfg)
         self.embed_dim = self.encoder.channel
+
+        self.pos_embed = build_position_encoding(pos_type=pos_type, d_model=self.embed_dim)
 
         self.AutoRegressive_cfg = {
             "num_blocks": cfg["num_blocks"],
@@ -215,17 +218,22 @@ class Encoder_Regressor(nn.Module):
         # inputs: [B, L, in_dim]; 
         # B is the batch size; L is the sequence length, in_dim is the input temporal dimension
         # output: [B, feature_dim]
+
         b, l, t_d = inputs.shape
         device = inputs.device
         assert t_d == self.AutoEncoder_cfg["in_dim"], \
             "Input temporal dimension should be the same as the in_dim in AutoEncoder"
         encoder_outputs = torch.as_tensor([self.encoder(inputs[i, :, :].unsqueeze(1) 
                                                         for i in range(b))]).to(device)
-        assert encoder_outputs.shape == (b, self.embed_dim, l), \
-            "Encoder output shape should be [B, Embedding, L]"
+        assert encoder_outputs.shape == (b, l, self.embed_dim), \
+            "Encoder output shape should be [B, L, Embedding]"
         
-        feature = self.regressor(encoder_outputs)   # [B, feature_dim]
+        pos = self.pos_embed(encoder_outputs)   # [B, L, Embedding]
+        
+        feature = self.regressor(encoder_outputs, pos_embed=pos)   # [B, feature_dim]
         # pred: [time_step, B, embed_dim, 1]
         pred = torch.matmul(self.linear_trans.unsqueeze(1), feature.unsqueeze(2))
+        assert pred.shape == (self.timestep, b, self.embed_dim, 1), \
+            "pred shape should be [time_step, B, embed_dim, 1]"
         
         return pred.squeeze(-1)
