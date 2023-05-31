@@ -65,8 +65,8 @@ class PositionEmbeddingLearned(nn.Module):
         return pos
 
 
-def build_position_encoding(type, hyp):
-    N_steps = hyp["Temporal_dim"]
+def build_position_encoding(type, embed_dim):
+    N_steps = embed_dim
     if type in ('v2', 'sine'):
         # TODO find a better way of exposing other arguments
         position_embedding = PositionEmbeddingSine(N_steps, normalize=True)

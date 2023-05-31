@@ -33,6 +33,8 @@ def _get_activation_fn(activation):
         return F.sigmoid
     if activation == "leaky_relu":
         return F.leaky_relu
+    if activation == "tanh":
+        return F.tanh
     raise RuntimeError(F"activation should be relu/gelu, not {activation}.")
 
 
@@ -60,25 +62,25 @@ class ResBlock(nn.Module):
 
 
 class Conv1d_AutoEncoder(nn.Module):
-    def __init__(self, in_dim: int = 512, drop_path: float = 0.4) -> None:
+    def __init__(self, in_dim: int = 512, in_channel: int = 1, drop_path: float = 0.4) -> None:
         super(Conv1d_AutoEncoder, self).__init__()
-        self.embed_dim = in_dim
+        self.temp_dim = in_dim
         self.channel = 16
         self.conv1 = Conv1d_BN_Relu(in_dim, self.channel, kernel_size=13, padding=13 // 2)
         self.conv2 = Conv1d_BN_Relu(self.channel, self.channel * 2, kernel_size=13, stride=2, padding=11 // 2)
         self.channel *= 2
-        self.embed_dim //= 2
+        self.temp_dim //= 2
 
         self.ResNet = nn.ModuleList()
         res_params = zip([1, 2, 8, 8, 4], [11, 9, 5, 5, 5]) # num_blocks, kernel_size
-        # final channels = 512; final embed_dim = in_dim // (2^5) = in_dim // 32
+        # final channels = 512; final temp_dim = in_dim // (2^5) = in_dim // 32
         for i, (num_blocks, kernel_size) in enumerate(res_params):
             self.ResNet.extend([ResBlock(self.channel, kernel_size, drop_path) for _ in range(num_blocks)])
             if i != len(res_params) - 1:
                 self.ResNet.append(Conv1d_BN_Relu(self.channel, self.channel * 2, 
                                                   kernel_size, stride=2, padding=kernel_size // 2))
                 self.channel *= 2
-                self.embed_dim //= 2
+                self.temp_dim //= 2
         
         self.avgpool = nn.AdaptiveAvgPool1d(1)
         self._reset_parameters()
@@ -159,7 +161,7 @@ class Autoregressive(nn.Module):
         self.sequence_length = block_params["sequence_length"]
 
         self.feature_layer = nn.Linear(self.embed_dim * self.sequence_length, feature_dim)
-        self.norm = nn.LayerNorm(feature_dim)
+        self.norm = _get_activation_fn("tanh")
 
         self._reset_parameters()
     
@@ -191,17 +193,18 @@ class Encoder_Regressor(nn.Module):
         assert cfg is not None, "cfg should be a dict"
         self.AutoEncoder_cfg = {
             "in_dim": cfg["Temporal_dim"],
+            "in_channel": cfg["in_channel"],
             "drop_path": cfg["drop_path"],
         }
         self.encoder = Conv1d_AutoEncoder(**self.AutoEncoder_cfg)
         self.embed_dim = self.encoder.channel
-
-        self.pos_embed = build_position_encoding(pos_type=pos_type, d_model=self.embed_dim)
+        assert self.embed_dim == cfg["contrast_embed_dim"], "embed_dim should be the same as the output of Conv1d_AutoEncoder"
+        self.pos_embed = build_position_encoding(pos_type=pos_type, embed_dim=self.embed_dim)
 
         self.AutoRegressive_cfg = {
-            "num_blocks": cfg["num_blocks"],
+            "num_blocks": cfg["num_contrast_blocks"],
             "feature_dim": cfg["feature_dim"],
-            "num_layers": cfg["num_layers"],
+            "num_layers": cfg["num_contrast_layers"],
             "d_model": self.embed_dim,
             "nhead": cfg["nhead"],
             "dropout": cfg["dropout"],
