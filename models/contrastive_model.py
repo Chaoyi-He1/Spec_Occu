@@ -115,7 +115,7 @@ class TransEncoder_Conv1d_Act_block(nn.Module):
                                            nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout,
                                            drop_path=drop_path, activation=activation, 
                                            normalize_before=normalize_before)
-        self.conv1d = nn.Conv1d(in_channels=sequence_length, out_channels=sequence_length / 2, 
+        self.conv1d = nn.Conv1d(in_channels=sequence_length, out_channels=sequence_length, 
                                 kernel_size=kernel, stride=2, padding=kernel // 2 - 1)
         self.activation = _get_activation_fn(activation)
     
@@ -153,8 +153,7 @@ class Autoregressive(nn.Module):
         block_list = []
         for _ in range(num_blocks):
             block_list.append(TransEncoder_Conv1d_Act_block(**block_params))
-            block_params["sequence_length"] /= 2
-            block_params["d_model"] /= 2
+            block_list["d_model"] //= 2
 
         self.blocks = nn.ModuleList(block_list)
         self.embed_dim = block_params["d_model"]

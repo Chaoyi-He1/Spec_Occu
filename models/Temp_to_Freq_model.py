@@ -247,5 +247,5 @@ class Transformer(nn.Module):
         hs = self.decoder(tgt, memory, pos_embed=decoder_pos_embed, query_pos_embed=query_pos_embed)
 
         pred_cls = torch.einsum("bnd,ndc->bnc", hs, self.classify_head)
-        return pred_cls
+        return F.sigmoid(pred_cls)
         

@@ -33,7 +33,7 @@ class ContrastiveLoss(nn.Module):
     def __init__(self, time_step_weights: list = None):
         # time_step_weights: list, the weights for each time step loss
         super(ContrastiveLoss, self).__init__()
-        assert time_step_weights is not None, "time_step_weights should be a list"
+        assert time_step_weights is not None, "time_step_weights must be provided as a list"
         self.weights = torch.tensor(time_step_weights)
         self.softmax = nn.Softmax(dim=-1)
         self.lsoftmax = nn.LogSoftmax(dim=-1)

@@ -22,8 +22,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         
         # Compute the output
         with torch.cuda.amp.autocast(enabled=scaler is not None):
-            pred_embed = model(past)    #pred_embed: [time_step, B, feature_dim]
-            infoNCELoss, cls_pred = criterion(pred_embed, future)
+            pred_embed_future = model(past)    #pred_embed_future: [time_step, B, feature_dim]
+            infoNCELoss, cls_pred = criterion(pred_embed_future, future)
             
         # reduce losses over all GPUs for logging purposes
         infoNCELoss_reduced = reduce_loss(infoNCELoss)
