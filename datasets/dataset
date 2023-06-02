@@ -97,3 +97,4 @@ class Temporal_to_Freq_data(Dataset):
         
         assert data.shape[0] == label.shape[0], "data and label must have the same length."
         return data, label
+
