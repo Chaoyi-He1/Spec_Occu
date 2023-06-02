@@ -51,6 +51,10 @@ class Contrastive_data(Dataset):
             data_future = self.data[index+self.past_steps:index+self.len, :, :]
         
         return data_past, data_future
+    
+    @staticmethod
+    def collate_fn(batch):
+        data_past, data_future = list(zip(*batch))
 
 
 class Temporal_to_Freq_data(Dataset):
