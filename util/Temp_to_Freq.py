@@ -29,7 +29,6 @@ def Steps_Accuracy(pred: Tensor, targets: Tensor):
     :return: Steps_Accuracy: Tensor, the temporal to frequency accuracy
     """
     b, l, n = targets.shape
-    device = targets.device
 
     assert pred.shape == (b, l, n), \
         "pred shape should be [B, time_step, num_freq]"
@@ -38,8 +37,7 @@ def Steps_Accuracy(pred: Tensor, targets: Tensor):
     for i in range(l):
         acc_steps.append(torch.eq(pred[:, i, :].round(), 
                                   targets[:, i, :]).sum().float() / (b * n))
-    acc = torch.as_tensor(acc_steps).to(device)
-    return acc
+    return acc_steps
 
 
 class Temporal_Freq_Loss(nn.Module):
@@ -71,6 +69,6 @@ class Temporal_Freq_Loss(nn.Module):
         # Calculate the loss
         loss_steps = self.loss(pred, targets, reduction="none").to(device)
         loss = torch.sum(loss_steps * self.weights)
-        acc = Steps_Accuracy(pred, targets)
-        return loss, acc
+        acc_steps = Steps_Accuracy(pred, targets)
+        return loss, acc_steps
     
