@@ -208,7 +208,7 @@ class Encoder_Regressor(nn.Module):
             "nhead": cfg["nhead"],
             "dropout": cfg["dropout"],
             "drop_path": cfg["drop_path"],
-            "sequence_length": cfg["sequence_length"],
+            "sequence_length": cfg["contrast_sequence_length"],
         }
         self.regressor = Autoregressive(**self.AutoRegressive_cfg)
 
@@ -239,3 +239,6 @@ class Encoder_Regressor(nn.Module):
             "pred shape should be [time_step, B, embed_dim, 1]"
         
         return pred.squeeze(-1)
+
+def build_contrastive_model(cfg: dict = None, timestep: int = 12, pos_type: str = "sine") -> nn.Module:
+    return Encoder_Regressor(cfg, timestep, pos_type)
