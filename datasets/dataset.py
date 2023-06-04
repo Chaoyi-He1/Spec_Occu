@@ -16,7 +16,7 @@ class Contrastive_data(Dataset):
         self.data_path = data_path
         self.train_split = train_split
         self.train = train
-        self.data, self.data_len = self.cache_data(cache)
+        self.data, self.data_len, self.train_len = self.cache_data(cache)
 
         self.future_step = future_step
         self.past_steps = past_steps
@@ -28,11 +28,11 @@ class Contrastive_data(Dataset):
             data = np.stack([data["real"][:, np.newaxis, :], data["imag"][:, np.newaxis, :]], axis=1)
             train_len = (data.shape[0] * self.train_split) // 1
             data = data[:train_len, :, :] if self.train else data[train_len:, :, :]
-            return data, data.shape[0]
+            return data, data.shape[0], train_len
         else:
             train_len = (data["real"].shape[0] * self.train_split) // 1
             data_len = train_len if self.train else data["real"].shape[0] - train_len
-            return None, data_len
+            return None, data_len, train_len
 
         
     def __len__(self):
@@ -46,6 +46,7 @@ class Contrastive_data(Dataset):
             tuple: (data_past, data_future) where data_past is the past steps of the data and
             data_future is the future steps of the data to learn.
         """
+        index = self.train_len + index if not self.train else index
         if self.data is None:
             with h5py.File(self.data_path, "r") as f:
                 real = f["real"][index:index+self.time_len, :]
