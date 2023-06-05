@@ -47,7 +47,7 @@ def get_args_parser():
 
     # Optimization parameters
     parser.add_argument('--lr', default=0.0001, type=float)
-    parser.add_argument('--lf', default=0.01, type=float)
+    parser.add_argument('--lrf', default=0.01, type=float)
     parser.add_argument('--weight_decay', default=1e-6, type=float)
     parser.add_argument('--epochs', default=300, type=int)
     parser.add_argument('--batch_size', default=32, type=int)
@@ -141,7 +141,7 @@ def main(args):
     model = build_contrastive_model(cfg=cfg, timestep=args.time_step, pos_type=args.positional_embedding)
     model.to(device)
     if args.rank in [-1, 0]:
-        tb_writer.add_graph(model, torch.randn((args.batch_size, 2, cfg["Temporal_dim"]), 
+        tb_writer.add_graph(model, torch.randn((args.batch_size, cfg["contrast_sequence_length"], 2, cfg["Temporal_dim"]), 
                                               device=device, dtype=torch.float), use_strict_trace=False)
     
     # load previous model if resume training
@@ -227,7 +227,7 @@ def main(args):
         # train
         train_loss_dict = train_one_epoch(model=model, data_loader=data_loader_train, criterion=criterion, 
                                           optimizer=optimizer, device=device, epoch=epoch, 
-                                          scaler=scaler, args=args, tb_writer=tb_writer)
+                                          scaler=scaler, args=args)
         scheduler.step()
 
         # validation

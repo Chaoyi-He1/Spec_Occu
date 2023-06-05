@@ -62,11 +62,12 @@ class ResBlock(nn.Module):
 
 
 class Conv1d_AutoEncoder(nn.Module):
-    def __init__(self, in_dim: int = 512, in_channel: int = 1, drop_path: float = 0.4) -> None:
+    def __init__(self, in_dim: int = 512, in_channel: int = 2, drop_path: float = 0.4) -> None:
         super(Conv1d_AutoEncoder, self).__init__()
+        self.in_channel = in_channel
         self.temp_dim = in_dim
         self.channel = 16
-        self.conv1 = Conv1d_BN_Relu(in_dim, self.channel, kernel_size=13, padding=13 // 2)
+        self.conv1 = Conv1d_BN_Relu(self.in_channel, self.channel, kernel_size=13, padding=13 // 2)
         self.conv2 = Conv1d_BN_Relu(self.channel, self.channel * 2, kernel_size=13, stride=2, padding=11 // 2)
         self.channel *= 2
         self.temp_dim //= 2
@@ -91,10 +92,10 @@ class Conv1d_AutoEncoder(nn.Module):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, inputs: Tensor) -> Tensor:
-        # inputs: [L, 1, in_dim], 
+        # inputs: [L, 2, in_dim], 
         # L is the sequence_length in the following Transformer based AutoRegressive model
         # output: [L, Embedding], Embedding = 512
-        assert inputs.shape[1] == 1 and len(inputs.shape) == 3, "Input shape should be [B, 1, Embedding]"
+        assert inputs.shape[1] == 2 and len(inputs.shape) == 3, "Input shape should be [B, 2, Embedding]"
 
         x = self.conv1(inputs)
         x = self.conv2(x)
@@ -116,7 +117,7 @@ class TransEncoder_Conv1d_Act_block(nn.Module):
                                            drop_path=drop_path, activation=activation, 
                                            normalize_before=normalize_before)
         self.conv1d = nn.Conv1d(in_channels=sequence_length, out_channels=sequence_length, 
-                                kernel_size=kernel, stride=2, padding=kernel // 2 - 1)
+                                kernel_size=kernel, stride=2, padding=kernel // 2)
         self.activation = _get_activation_fn(activation)
     
     def forward(self, src: Tensor,
@@ -125,13 +126,13 @@ class TransEncoder_Conv1d_Act_block(nn.Module):
         # src: [B, L, Embedding] 
         # L is the sequence length; Embedding is the embedding dimension; B is the batch size
 
-        x = self.encoder(src, src_key_padding_mask, pos_embed)
+        x = self.encoder(src=src, src_key_padding_mask=src_key_padding_mask, pos=pos_embed)
         x = self.conv1d(x)
         return self.activation(x)
 
 
 class Autoregressive(nn.Module):
-    def __init__(self, num_blocks=3, feature_dim=256,
+    def __init__(self, num_blocks=3, feature_dim=256, pos_type="sine",
                  num_layers=4, d_model=512, nhead=8, dim_feedforward=512, dropout=0.1,
                  drop_path=0.4, activation="relu", normalize_before=True,
                  kernel=7, sequence_length=32) -> None:
@@ -151,8 +152,11 @@ class Autoregressive(nn.Module):
         }
 
         block_list = []
+        self.pos_embeds = []
         for _ in range(num_blocks):
             block_list.append(TransEncoder_Conv1d_Act_block(**block_params))
+            self.pos_embeds.append(build_position_encoding(type=pos_type, 
+                                                           embed_dim=block_params["d_model"]))
             block_params["d_model"] //= 2
 
         self.blocks = nn.ModuleList(block_list)
@@ -166,19 +170,19 @@ class Autoregressive(nn.Module):
     
     def _reset_parameters(self):
         for p in self.parameters():
-            if p.dim() > 1:
+            if p.dim() > 1 and p.requires_grad:
                 nn.init.xavier_uniform_(p)
 
     def forward(self, src: Tensor,
-                src_key_padding_mask: Tensor = None, 
-                pos_embed: Optional[Tensor] = None) -> Tensor:
+                src_key_padding_mask: Tensor = None) -> Tensor:
         """
         Parameters:
             src: [B, L, Embedding]
             src_key_padding_mask: [B, L], to mask out the padding part
             pos_embed: [B, L, Embedding]
         """
-        for block in self.blocks:
+        for i, block in enumerate(self.blocks):
+            pos_embed = self.pos_embeds[i](src)
             src = block(src, src_key_padding_mask, pos_embed)
         src = src.flatten(1)
         src = self.feature_layer(src)
@@ -198,7 +202,6 @@ class Encoder_Regressor(nn.Module):
         self.encoder = Conv1d_AutoEncoder(**self.AutoEncoder_cfg)
         self.embed_dim = self.encoder.channel
         assert self.embed_dim == cfg["contrast_embed_dim"], "embed_dim should be the same as the output of Conv1d_AutoEncoder"
-        self.pos_embed = build_position_encoding(type=pos_type, embed_dim=self.embed_dim)
 
         self.AutoRegressive_cfg = {
             "num_blocks": cfg["num_contrast_blocks"],
@@ -210,6 +213,7 @@ class Encoder_Regressor(nn.Module):
             "drop_path": cfg["drop_path"],
             "sequence_length": cfg["contrast_sequence_length"],
             "dim_feedforward": cfg["dim_feedforward"],
+            "pos_type": pos_type,
         }
         self.regressor = Autoregressive(**self.AutoRegressive_cfg)
 
@@ -222,18 +226,18 @@ class Encoder_Regressor(nn.Module):
         # B is the batch size; L is the sequence length, in_dim is the input temporal dimension
         # output: [B, feature_dim]
 
-        b, l, t_d = inputs.shape
+        b, l, c, t_d = inputs.shape
         device = inputs.device
         assert t_d == self.AutoEncoder_cfg["in_dim"], \
             "Input temporal dimension should be the same as the in_dim in AutoEncoder"
-        encoder_outputs = torch.as_tensor([self.encoder(inputs[i, :, :].unsqueeze(1) 
-                                                        for i in range(b))]).to(device)
+        assert c == self.encoder.in_channel, \
+            "Input channel should be the same as the in_channel in AutoEncoder"
+        encoder_outputs = torch.stack([self.encoder(inputs[i, :, :, :])
+                                        for i in range(b)]).to(device)
         assert encoder_outputs.shape == (b, l, self.embed_dim), \
             "Encoder output shape should be [B, L, Embedding]"
         
-        pos = self.pos_embed(encoder_outputs)   # [B, L, Embedding]
-        
-        feature = self.regressor(encoder_outputs, pos_embed=pos)   # [B, feature_dim]
+        feature = self.regressor(encoder_outputs)   # [B, feature_dim]
         # pred: [time_step, B, embed_dim, 1]
         pred = torch.matmul(self.linear_trans.unsqueeze(1), feature.unsqueeze(2))
         assert pred.shape == (self.timestep, b, self.embed_dim, 1), \

@@ -24,8 +24,8 @@ class PositionEmbeddingSine(nn.Module):
 
     def forward(self, x, mask=None):
         l, dim = x.shape[-2:]
-        assert dim == self.num_pos_feats and l <= 50, \
-            f"the size of the pos embedding is not correct, {l} vs {50}"
+        assert dim == self.num_pos_feats and l <= 100, \
+            f"the size of the pos embedding is not correct, {l} vs {100}"
         if mask is None:
             mask = torch.zeros(x.shape[:2], dtype=torch.bool, device=x.device)
         not_mask = ~mask
@@ -36,8 +36,8 @@ class PositionEmbeddingSine(nn.Module):
 
         dim_t = torch.arange(self.num_pos_feats, dtype=torch.float32, device=x.device)
         dim_t = self.temperature ** (2 * (dim_t // 2) / self.num_pos_feats)
-
-        pos = embed[:, :, :, None] / dim_t
+ 
+        pos = embed[:, :, None] / dim_t
         pos = torch.stack((pos[:, :, 0::2].sin(), pos[:, :, 1::2].cos()), dim=3).flatten(2)
         return pos
 
@@ -48,7 +48,7 @@ class PositionEmbeddingLearned(nn.Module):
     """
     def __init__(self, num_pos_feats=256):
         super().__init__()
-        self.embed = nn.Embedding(50, num_pos_feats)
+        self.embed = nn.Embedding(100, num_pos_feats)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -57,8 +57,8 @@ class PositionEmbeddingLearned(nn.Module):
 
     def forward(self, x):
         l, dim = x.shape[-2:]
-        assert dim == self.num_pos_feats and l <= 50, \
-            f"the size of the pos embedding is not correct, {l} vs {50}"
+        assert dim == self.num_pos_feats and l <= 100, \
+            f"the size of the pos embedding is not correct, {l} vs {100}"
         i = torch.arange(l, device=x.device)
         embeded = self.embed(i)
         pos = embeded.unsqueeze(0).repeat(x.shape[0], 1, 1)
