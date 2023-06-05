@@ -72,7 +72,7 @@ class Conv1d_AutoEncoder(nn.Module):
         self.temp_dim //= 2
 
         self.ResNet = nn.ModuleList()
-        res_params = zip([1, 2, 8, 8, 4], [11, 9, 5, 5, 5]) # num_blocks, kernel_size
+        res_params = res_params = list(zip([1, 2, 8, 8, 4], [11, 9, 5, 5, 5])) # num_blocks, kernel_size
         # final channels = 512; final temp_dim = in_dim // (2^5) = in_dim // 32
         for i, (num_blocks, kernel_size) in enumerate(res_params):
             self.ResNet.extend([ResBlock(self.channel, kernel_size, drop_path) for _ in range(num_blocks)])
@@ -105,7 +105,7 @@ class Conv1d_AutoEncoder(nn.Module):
         
 
 class TransEncoder_Conv1d_Act_block(nn.Module):
-    def __init__(self, num_layers=4, d_model=512, nhead=8, dim_feedforward=2048, dropout=0.1,
+    def __init__(self, num_layers=4, d_model=512, nhead=8, dim_feedforward=512, dropout=0.1,
                  drop_path=0.4, activation="relu", normalize_before=True,
                  kernel=7, sequence_length=64):
         super(TransEncoder_Conv1d_Act_block, self).__init__()
@@ -132,7 +132,7 @@ class TransEncoder_Conv1d_Act_block(nn.Module):
 
 class Autoregressive(nn.Module):
     def __init__(self, num_blocks=3, feature_dim=256,
-                 num_layers=4, d_model=512, nhead=8, dim_feedforward=2048, dropout=0.1,
+                 num_layers=4, d_model=512, nhead=8, dim_feedforward=512, dropout=0.1,
                  drop_path=0.4, activation="relu", normalize_before=True,
                  kernel=7, sequence_length=32) -> None:
         super(Autoregressive, self).__init__()
@@ -153,7 +153,7 @@ class Autoregressive(nn.Module):
         block_list = []
         for _ in range(num_blocks):
             block_list.append(TransEncoder_Conv1d_Act_block(**block_params))
-            block_list["d_model"] //= 2
+            block_params["d_model"] //= 2
 
         self.blocks = nn.ModuleList(block_list)
         self.embed_dim = block_params["d_model"]
@@ -192,13 +192,13 @@ class Encoder_Regressor(nn.Module):
         assert cfg is not None, "cfg should be a dict"
         self.AutoEncoder_cfg = {
             "in_dim": cfg["Temporal_dim"],
-            "in_channel": cfg["in_channel"],
+            "in_channel": cfg["in_channels"],
             "drop_path": cfg["drop_path"],
         }
         self.encoder = Conv1d_AutoEncoder(**self.AutoEncoder_cfg)
         self.embed_dim = self.encoder.channel
         assert self.embed_dim == cfg["contrast_embed_dim"], "embed_dim should be the same as the output of Conv1d_AutoEncoder"
-        self.pos_embed = build_position_encoding(pos_type=pos_type, embed_dim=self.embed_dim)
+        self.pos_embed = build_position_encoding(type=pos_type, embed_dim=self.embed_dim)
 
         self.AutoRegressive_cfg = {
             "num_blocks": cfg["num_contrast_blocks"],
@@ -209,6 +209,7 @@ class Encoder_Regressor(nn.Module):
             "dropout": cfg["dropout"],
             "drop_path": cfg["drop_path"],
             "sequence_length": cfg["contrast_sequence_length"],
+            "dim_feedforward": cfg["dim_feedforward"],
         }
         self.regressor = Autoregressive(**self.AutoRegressive_cfg)
 

@@ -1,0 +1,16 @@
+# Hyperparameters for training
+
+# General parameters
+Temporal_dim: 1024
+in_channels: 2
+dropout: 0.2
+drop_path: 0.2
+
+# Contrastive model
+contrast_embed_dim: 512  # This is fixed based on the Encoder's convolution channels
+num_contrast_blocks: 4
+feature_dim: 256
+num_contrast_layers: 4
+nhead: 8
+contrast_sequence_length: 64 # this is the number of time frames of the history feeded to the model
+dim_feedforward: 512

@@ -8,7 +8,7 @@ from torch.utils.data import Dataset
 
 class Contrastive_data(Dataset):
     def __init__(self, data_path: str = "", cache: bool = True, 
-                 past_steps: int = 32, future_step: int = 12,
+                 past_steps: int = 32, future_steps: int = 12,
                  train_split: float = 0.8, train: bool = True) -> None:
         super(Contrastive_data, self).__init__()
         assert os.path.isfile(data_path), "path '{}' does not exist.".format(data_path)
@@ -18,20 +18,36 @@ class Contrastive_data(Dataset):
         self.train = train
         self.data, self.data_len, self.train_len = self.cache_data(cache)
 
-        self.future_step = future_step
+        self.future_step = future_steps
         self.past_steps = past_steps
-        self.time_len = past_steps + future_step
+        self.time_len = past_steps + future_steps
+    
+    def h5py_to_dict(self, h5_obj):
+        if isinstance(h5_obj, h5py.File) or isinstance(h5_obj, h5py.Group):
+            data = {}
+            for key in h5_obj.keys():
+                data[key] = self.h5py_to_dict(h5_obj[key])
+            return data
+        elif isinstance(h5_obj, h5py.Dataset):
+            if len(h5_obj.shape) == 2:  # Check if the dataset represents a matrix
+                return np.transpose(h5_obj[()])  # Transpose the matrix
+            else:
+                return h5_obj[()]
+        else:
+            return h5_obj
 
     def cache_data(self, cache: bool = True):
-        data = sio.loadmat(self.data_path)
+        print("Loading %s data from %s ..." % ("train" if self.train else "test", self.data_path))
+        with h5py.File(self.data_path, 'r') as f:
+            data = self.h5py_to_dict(f)
         if cache:
-            data = np.stack([data["real"][:, np.newaxis, :], data["imag"][:, np.newaxis, :]], axis=1)
-            train_len = (data.shape[0] * self.train_split) // 1
+            data = np.stack([data["data_frame_I"], data["data_frame_Q"]], axis=1)
+            train_len = int(data.shape[0] * self.train_split)
             data = data[:train_len, :, :] if self.train else data[train_len:, :, :]
             return data, data.shape[0], train_len
         else:
-            train_len = (data["real"].shape[0] * self.train_split) // 1
-            data_len = train_len if self.train else data["real"].shape[0] - train_len
+            train_len = int(data["data_frame_Q"].shape[0] * self.train_split)
+            data_len = train_len if self.train else data["data_frame_I"].shape[0] - train_len
             return None, data_len, train_len
 
         
@@ -49,12 +65,12 @@ class Contrastive_data(Dataset):
         index = self.train_len + index if not self.train else index
         if self.data is None:
             with h5py.File(self.data_path, "r") as f:
-                real = f["real"][index:index+self.time_len, :]
-                imag = f["imag"][index:index+self.time_len, :]
-                data_past = np.stack([real[index:index+self.past_steps, np.newaxis, :], 
-                                      imag[index:index+self.past_steps, np.newaxis, :]], axis=1)
-                data_future = np.stack([real[index+self.past_steps:index+self.time_len, np.newaxis, :],
-                                        imag[index+self.past_steps:index+self.time_len, np.newaxis, :]], axis=1)
+                real = f["data_frame_I"][index:index+self.time_len, :]
+                imag = f["data_frame_Q"][index:index+self.time_len, :]
+                data_past = np.stack([real[index:index+self.past_steps, :], 
+                                      imag[index:index+self.past_steps, :]], axis=1)
+                data_future = np.stack([real[index+self.past_steps:index+self.time_len, :],
+                                        imag[index+self.past_steps:index+self.time_len, :]], axis=1)
         else:
             data_past = self.data[index:index+self.past_steps, :, :]
             data_future = self.data[index+self.past_steps:index+self.time_len, :, :]

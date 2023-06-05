@@ -39,7 +39,7 @@ def get_args_parser():
     # Model parameters
     parser.add_argument('--resume', type=str, default='', help="initial weights path")
     parser.add_argument('--time-step', type=int, default=12, help="number of time steps to predict")
-    parser.add_argument('--hpy', type=str, default='cfgs/hyper_params.yaml', help="hyper parameters path")
+    parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
     parser.add_argument('--positional-embedding', default='sine', choices=('sine', 'learned'), help="type of positional embedding to use on top of the image features")
     parser.add_argument('--sync-bn', action='store_true', help='enabling apex sync BN.')
     parser.add_argument('--freeze-encoder', action='store_true', help="freeze the encoder")
@@ -55,7 +55,7 @@ def get_args_parser():
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
     # dataset parameters
-    parser.add_argument('--data-path', default='path/to/train.mat', help='dataset path')
+    parser.add_argument('--data-path', default='path/train.mat', help='dataset path')
     parser.add_argument('--cache-data', default=True, type=bool, help='cache data for faster training')
     parser.add_argument('--train-split', default=0.8, type=float, help='train split')
     parser.add_argument('--output-dir', default='weights', help='path where to save, empty for no saving')
@@ -141,7 +141,7 @@ def main(args):
     model = build_contrastive_model(cfg=cfg, timestep=args.time_step, pos_type=args.positional_embedding)
     model.to(device)
     if args.rank in [-1, 0]:
-        tb_writer.add_graph(model, torch.rand((args.batch_size, 2, cfg["Temporal_dim"]), 
+        tb_writer.add_graph(model, torch.randn((args.batch_size, 2, cfg["Temporal_dim"]), 
                                               device=device, dtype=torch.float), use_strict_trace=False)
     
     # load previous model if resume training
@@ -267,7 +267,7 @@ def main(args):
                     "optimizer": optimizer.state_dict(),
                     "scaler": scaler.state_dict() if scaler is not None else None,
                     "lr_scheduler": scheduler.state_dict(),
-                }, os.path.join(output_dir, "best.pth"))
+                }, best)
         else:
             # save latest model
             utils.save_on_master({
@@ -289,4 +289,3 @@ if __name__ == '__main__':
     if args.output_dir:
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     main(args)
-    
