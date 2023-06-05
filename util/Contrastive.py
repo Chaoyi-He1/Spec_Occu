@@ -37,7 +37,7 @@ class ContrastiveLoss(nn.Module):
         self.weights = torch.tensor(time_step_weights)
         self.softmax = nn.Softmax(dim=-1)
         self.lsoftmax = nn.LogSoftmax(dim=-1)
-    
+
     def forward(self, pred: Tensor, targets: Tensor, model: nn.Module):
         """
         Calculate the infoNCE loss.
@@ -48,26 +48,28 @@ class ContrastiveLoss(nn.Module):
         :return: NCELoss: Tensor, the infoNCE loss
                  cls_prd: Tensor, the classification accuracy
         """
-        b, l, t_d = targets.shape
-        device = targets.device
-
-        assert pred.shape == (l, b, model.embed_dim), \
-            "pred shape should be [time_step, B, embed_dim]"
-        assert t_d == model.AutoEncoder_cfg["in_dim"], \
-            "Input temporal dimension should be the same as the in_dim in AutoEncoder"
-        assert len(self.weights) == l, "time_step_weights length should be the same as time_step"
-        
-        # Calculate the true futures (targets) encoded features (embed vectors)
-        # encoded_targets: [B, time_step, embed_dim]
-        # TODO: use torch.no_grad() or not?
+        # TODO: use torch.no_grad() or not for targets encoding?
         with torch.no_grad():
-            encoded_targets = torch.as_tensor([self.encoder(targets[i, :, :].unsqueeze(1) 
-                                                            for i in range(b))]).to(device)
+            b, l, c, t_d = targets.shape
+            device = targets.device
+
+            assert pred.shape == (l, b, model.embed_dim), \
+                "pred shape should be [time_step, B, embed_dim]"
+            assert t_d == model.AutoEncoder_cfg["in_dim"], \
+                "Input temporal dimension should be the same as the in_dim in AutoEncoder"
+            assert len(self.weights) == l, "time_step_weights length should be the same as time_step"
+            
+            # Calculate the true futures (targets) encoded features (embed vectors)
+            # encoded_targets: [B, time_step, embed_dim]
+            
+            encoded_targets = torch.as_tensor([self.encoder(targets[i, :, :, :])
+                                            for i in range(b)]).to(device)
             encoded_targets = encoded_targets.permute(1, 0, 2).contiguous()
 
         # Calculate the loss
         # pred: [time_step, B, embed_dim]; encoded_targets: [time_step, B, embed_dim]
         # mutural_info: [time_step, B, B]
+        
         mutural_info = torch.matmul(encoded_targets, torch.transpose(pred, 1, 2))
         NCELoss = -torch.sum(torch.diagonal(self.lsoftmax(mutural_info), dim1=-2, dim2=-1) * self.weights)
         NCELoss /= l * b
