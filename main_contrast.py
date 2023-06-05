@@ -227,7 +227,7 @@ def main(args):
         # train
         train_loss_dict = train_one_epoch(model=model, data_loader=data_loader_train, criterion=criterion, 
                                           optimizer=optimizer, device=device, epoch=epoch, 
-                                          scaler=scaler, args=args)
+                                          scaler=scaler)
         scheduler.step()
 
         # validation

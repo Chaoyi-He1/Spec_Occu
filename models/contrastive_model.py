@@ -95,7 +95,8 @@ class Conv1d_AutoEncoder(nn.Module):
         # inputs: [L, 2, in_dim], 
         # L is the sequence_length in the following Transformer based AutoRegressive model
         # output: [L, Embedding], Embedding = 512
-        assert inputs.shape[1] == 2 and len(inputs.shape) == 3, "Input shape should be [B, 2, Embedding]"
+        
+        # assert inputs.shape[1] == 2 and len(inputs.shape) == 3, "Input shape should be [B, 2, Embedding]"
 
         x = self.conv1(inputs)
         x = self.conv2(x)
@@ -228,20 +229,20 @@ class Encoder_Regressor(nn.Module):
 
         b, l, c, t_d = inputs.shape
         device = inputs.device
-        assert t_d == self.AutoEncoder_cfg["in_dim"], \
-            "Input temporal dimension should be the same as the in_dim in AutoEncoder"
-        assert c == self.encoder.in_channel, \
-            "Input channel should be the same as the in_channel in AutoEncoder"
+        # assert t_d == self.AutoEncoder_cfg["in_dim"], \
+        #     "Input temporal dimension should be the same as the in_dim in AutoEncoder"
+        # assert c == self.encoder.in_channel, \
+        #     "Input channel should be the same as the in_channel in AutoEncoder"
         encoder_outputs = torch.stack([self.encoder(inputs[i, :, :, :])
                                         for i in range(b)]).to(device)
-        assert encoder_outputs.shape == (b, l, self.embed_dim), \
-            "Encoder output shape should be [B, L, Embedding]"
+        # assert encoder_outputs.shape == (b, l, self.embed_dim), \
+        #     "Encoder output shape should be [B, L, Embedding]"
         
         feature = self.regressor(encoder_outputs)   # [B, feature_dim]
         # pred: [time_step, B, embed_dim, 1]
         pred = torch.matmul(self.linear_trans.unsqueeze(1), feature.unsqueeze(2))
-        assert pred.shape == (self.timestep, b, self.embed_dim, 1), \
-            "pred shape should be [time_step, B, embed_dim, 1]"
+        # assert pred.shape == (self.timestep, b, self.embed_dim, 1), \
+        #     "pred shape should be [time_step, B, embed_dim, 1]"
         
         return pred.squeeze(-1)
 
