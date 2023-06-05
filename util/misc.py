@@ -16,6 +16,7 @@ from contextlib import contextmanager
 import torch
 import torch.distributed as dist
 from torch import Tensor
+import numpy as np
 
 
 class SmoothedValue(object):
@@ -150,18 +151,20 @@ def reduce_dict(input_dict, average=True):
     return reduced_dict
 
 
-def reduce_loss(loss, reduction='mean'):
-    reduction_enum = {
-        'none': dist.Reduction.NONE,
-        'mean': dist.Reduction.MEAN,
-        'sum': dist.Reduction.SUM
-    }[reduction]
+def reduce_loss(loss, average=True):
+    """
+    Args:
+        input_value: the value to be reduced
+        average (bool): whether to do average or sum
+    Reduce the input value from all processes so that all processes
+    have the averaged or summed result. Returns the reduced value.
+    """
     world_size = get_world_size()
     if world_size < 2:
         return loss
     with torch.no_grad():
-        dist.reduce(loss, dst=0, op=reduction_enum)
-        if reduction != 'none':
+        dist.all_reduce(loss)
+        if average:
             loss /= world_size
     return loss
 
@@ -254,6 +257,38 @@ class MetricLogger(object):
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         print('{} Total time: {} ({:.4f} s / it)'.format(
             header, total_time_str, total_time / len(iterable)))
+
+
+class Step_Prediction(object):
+    def __init__(self, num_steps: int = 12) -> None:
+        self.num_steps = num_steps
+        self.acc_vec = np.zeros(num_steps)
+        self.update_count = 0
+    
+    def update(self, steps_acc):
+        for i, acc in enumerate(steps_acc):
+            if isinstance(acc, torch.Tensor):
+                acc = acc.item()
+            self.acc_vec[i] += acc
+        self.update_count += 1
+    
+    def reset(self):
+        self.acc_vec = np.zeros(self.num_steps)
+    
+    def compute(self):
+        return self.acc_vec / self.update_count
+
+    def reduce_from_all_processes(self):
+        if not torch.distributed.is_available():
+            return
+        if not torch.distributed.is_initialized():
+            return
+        torch.distributed.barrier()
+        torch.distributed.all_reduce(self.acc_vec)
+    
+    def __str__(self):
+        steps_acc = self.compute()
+        return " ".join([f"step_{i}: {acc:.4f}" for i, acc in enumerate(steps_acc)])
 
 
 def get_sha():

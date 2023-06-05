@@ -141,7 +141,8 @@ def main(args):
     model = build_contrastive_model(cfg=cfg, timestep=args.time_step, pos_type=args.positional_embedding)
     model.to(device)
     if args.rank in [-1, 0]:
-        tb_writer.add_graph(model, torch.randn((args.batch_size, cfg["contrast_sequence_length"], 2, cfg["Temporal_dim"]), 
+        tb_writer.add_graph(model, torch.randn((args.batch_size, 
+                                                cfg["contrast_sequence_length"], 2, cfg["Temporal_dim"]), 
                                               device=device, dtype=torch.float), use_strict_trace=False)
     
     # load previous model if resume training
@@ -225,14 +226,18 @@ def main(args):
             sampler_train.set_epoch(epoch)
 
         # train
-        train_loss_dict = train_one_epoch(model=model, data_loader=data_loader_train, criterion=criterion, 
-                                          optimizer=optimizer, device=device, epoch=epoch, 
-                                          scaler=scaler)
+        train_loss_dict, step_acc = train_one_epoch(model=model, data_loader=data_loader_train, 
+                                                    criterion=criterion, optimizer=optimizer, 
+                                                    device=device, epoch=epoch, scaler=scaler,
+                                                    steps=args.time_step)
+        print(str(step_acc))
         scheduler.step()
 
         # validation
-        test_loss_dict = evaluate(model=model, data_loader=data_loader_val, criterion=criterion,
-                                  device=device)
+        test_loss_dict, val_step_acc = evaluate(model=model, data_loader=data_loader_val, 
+                                                criterion=criterion, device=device, 
+                                                steps=args.time_step)
+        print(str(val_step_acc))
         
         # write results
         log_stats = {**{f'train_{k}': v for k, v in train_loss_dict.items()},

@@ -8,12 +8,14 @@ from typing import Iterable
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
                     device: torch.device, epoch: int, max_norm: float = 1.0,
-                    scaler=None):
+                    scaler=None, steps: int = 12):
     model.train()
     criterion.train()
+    Step_Predict = Step_Prediction(num_steps=steps)
     metric_logger = MetricLogger(delimiter="; ")
     metric_logger.add_meter('loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    metric_logger.add_meter('class_error', SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    metric_logger.add_meter('class_acc', SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    metric_logger.add_meter('class_acc', SmoothedValue(window_size=1, fmt='{value:.2f}'))
     metric_logger.add_meter('lr', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
     
@@ -24,11 +26,12 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         # Compute the output
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             pred_embed_future = model(past)    #pred_embed_future: [time_step, B, feature_dim]
-            infoNCELoss, cls_pred = criterion(pred_embed_future, future, model)
+            infoNCELoss, cls_pred, steps_cls_pred = criterion(pred_embed_future, future, model)
             
         # reduce losses over all GPUs for logging purposes
         infoNCELoss_reduced = reduce_loss(infoNCELoss)
         cls_pred_reduced = reduce_loss(cls_pred)
+        steps_cls_pred_reduced = reduce_loss(steps_cls_pred)
 
         # Backward
         optimizer.zero_grad()
@@ -42,26 +45,28 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         
         # Update metric
         metric_logger.update(loss=infoNCELoss_reduced.item())
-        metric_logger.update(class_error=cls_pred_reduced.item())
+        metric_logger.update(class_acc=cls_pred_reduced.item())
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
+        Step_Predict.update(steps_cls_pred_reduced)
 
     # Gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
 
     # return summary for logging
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}, Step_Predict
 
 
 @torch.no_grad()
 def evaluate(model: torch.nn.Module, criterion: torch.nn.Module, 
-             data_loader: Iterable, device: torch.device):
+             data_loader: Iterable, device: torch.device, steps: int = 12):
     model.eval()
     criterion.eval()
 
     #Metrics
+    Step_Predict = Step_Prediction(num_steps=steps)
     metric_logger = MetricLogger(delimiter="; ")
-    metric_logger.add_meter('class_error', SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    metric_logger.add_meter('class_accuracy', SmoothedValue(window_size=1, fmt='{value:.2f}'))
     metric_logger.add_meter('loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Test:'
 
@@ -75,17 +80,19 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module,
         
         # Compute the output
         pred_embed = model(past)    #pred_embed: [time_step, B, feature_dim]
-        infoNCELoss, cls_pred = criterion(pred_embed, future)
+        infoNCELoss, cls_pred, steps_cls_pred = criterion(pred_embed, future)
         
         # reduce losses over all GPUs for logging purposes
         infoNCELoss_reduced = reduce_loss(infoNCELoss)
         cls_pred_reduced = reduce_loss(cls_pred)
+        steps_cls_pred_reduced = reduce_loss(steps_cls_pred)
 
         # Update metric
+        Step_Predict.update(steps_cls_pred_reduced)
         metric_logger.update(loss=infoNCELoss_reduced.item())
-        metric_logger.update(class_error=cls_pred_reduced.item())
+        metric_logger.update(class_acc=cls_pred_reduced.item())
     
     # Gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
-    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}, Step_Predict
