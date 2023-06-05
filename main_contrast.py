@@ -48,7 +48,7 @@ def get_args_parser():
     # Optimization parameters
     parser.add_argument('--lr', default=0.0001, type=float)
     parser.add_argument('--lrf', default=0.01, type=float)
-    parser.add_argument('--weight_decay', default=1e-6, type=float)
+    parser.add_argument('--weight_decay', default=0.0, type=float)
     parser.add_argument('--epochs', default=300, type=int)
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--num_workers', default=4, type=int)
