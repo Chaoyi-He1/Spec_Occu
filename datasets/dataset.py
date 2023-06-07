@@ -62,8 +62,8 @@ class Contrastive_data(Dataset):
             tuple: (data_past, data_future) where data_past is the past steps of the data and
             data_future is the future steps of the data to learn.
         """
-        index = self.train_len + index if not self.train else index
         if self.data is None:
+            index = self.train_len + index if not self.train else index
             with h5py.File(self.data_path, "r") as f:
                 real = f["data_frame_I"][index:index+self.time_len, :]
                 imag = f["data_frame_Q"][index:index+self.time_len, :]
