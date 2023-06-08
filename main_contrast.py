@@ -43,7 +43,7 @@ def get_args_parser():
     parser.add_argument('--positional-embedding', default='sine', choices=('sine', 'learned'), help="type of positional embedding to use on top of the image features")
     parser.add_argument('--sync-bn', action='store_true', help='enabling apex sync BN.')
     parser.add_argument('--freeze-encoder', action='store_true', help="freeze the encoder")
-    parser.add_argument('--savebest', action='store_true', help="save best model")
+    parser.add_argument('--save-best', action='store_true', help="save best model")
 
     # Optimization parameters
     parser.add_argument('--lr', default=0.0001, type=float)
@@ -55,7 +55,7 @@ def get_args_parser():
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
     # dataset parameters
-    parser.add_argument('--data-path', default='path/train.mat', help='dataset path')
+    parser.add_argument('--data-path', default='path/data_matrix.mat', help='dataset path')
     parser.add_argument('--cache-data', default=True, type=bool, help='cache data for faster training')
     parser.add_argument('--train-split', default=0.8, type=float, help='train split')
     parser.add_argument('--output-dir', default='weights', help='path where to save, empty for no saving')
@@ -250,13 +250,14 @@ def main(args):
                 f.write(json.dumps(log_stats) + "\n")
         
         # write tensorboard
-        if tb_writer and utils.is_main_process():
-            items = {
-                **{f'train_{k}': v for k, v in train_loss_dict.items()},
-                **{f'test_{k}': v for k, v in test_loss_dict.items()},
-            }
-            for k, v in items.items():
-                tb_writer.add_scalar(k, v, epoch)
+        if utils.is_main_process():
+            if tb_writer:
+                items = {
+                    **{f'train_{k}': v for k, v in train_loss_dict.items()},
+                    **{f'test_{k}': v for k, v in test_loss_dict.items()},
+                }
+                for k, v in items.items():
+                    tb_writer.add_scalar(k, v, epoch)
         
         # save model
         if args.save_best:

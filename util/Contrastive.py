@@ -35,8 +35,8 @@ class ContrastiveLoss(nn.Module):
         super(ContrastiveLoss, self).__init__()
         assert time_step_weights is not None, "time_step_weights must be provided as a list"
         self.weights = torch.tensor(time_step_weights).view(-1, 1)
-        self.softmax = nn.Softmax(dim=1)
-        self.lsoftmax = nn.LogSoftmax(dim=1)
+        self.softmax = nn.Softmax(dim=-1)
+        self.lsoftmax = nn.LogSoftmax(dim=-1)
 
     def forward(self, pred: Tensor, targets: Tensor, model: nn.Module):
         """
@@ -73,15 +73,15 @@ class ContrastiveLoss(nn.Module):
         ##---------------------------------------------------------##
 
         # Calculate the loss
-        # pred: [time_step, B, embed_dim]; encoded_targets: [time_step, B, embed_dim]
-        # mutural_info: [time_step, B, B]
+        # pred: [time_step, B, \hat{embed_dim}]; encoded_targets: [time_step, B, embed_dim]
+        # mutural_info: [time_step, B, \hat{B}]
         
         mutural_info = torch.matmul(encoded_targets, torch.transpose(pred, 1, 2))
         NCELoss = -torch.sum(torch.diagonal(self.lsoftmax(mutural_info), dim1=-2, dim2=-1) * self.weights)
         NCELoss /= l * b
-        cls_prd = torch.sum(torch.eq(torch.argmax(self.softmax(mutural_info), dim=1),
+        cls_prd = torch.sum(torch.eq(torch.argmax(self.softmax(mutural_info), dim=-1),
                            torch.arange(b).unsqueeze(0).to(device))).float()
-        steps_cls_prd = torch.sum(torch.eq(torch.argmax(self.softmax(mutural_info), dim=1),
+        steps_cls_prd = torch.sum(torch.eq(torch.argmax(self.softmax(mutural_info), dim=-1),
                             torch.arange(b).unsqueeze(0).to(device)), dim=1).float()
         cls_prd /= l * b
         steps_cls_prd /= b

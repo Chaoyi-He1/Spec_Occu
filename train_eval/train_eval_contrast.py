@@ -80,7 +80,7 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module,
         
         # Compute the output
         pred_embed = model(past)    #pred_embed: [time_step, B, feature_dim]
-        infoNCELoss, cls_pred, steps_cls_pred = criterion(pred_embed, future)
+        infoNCELoss, cls_pred, steps_cls_pred = criterion(pred_embed, future, model)
         
         # reduce losses over all GPUs for logging purposes
         infoNCELoss_reduced = reduce_loss(infoNCELoss)
@@ -90,7 +90,7 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module,
         # Update metric
         Step_Predict.update(steps_cls_pred_reduced)
         metric_logger.update(loss=infoNCELoss_reduced.item())
-        metric_logger.update(class_acc=cls_pred_reduced.item())
+        metric_logger.update(class_accuracy=cls_pred_reduced.item())
     
     # Gather the stats from all processes
     metric_logger.synchronize_between_processes()

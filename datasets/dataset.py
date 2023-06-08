@@ -40,6 +40,8 @@ class Contrastive_data(Dataset):
         print("Loading %s data from %s ..." % ("train" if self.train else "test", self.data_path))
         with h5py.File(self.data_path, 'r') as f:
             data = self.h5py_to_dict(f)
+        for k, v in data.items():
+            data[k] = v[:100000, :]
         if cache:
             data = np.stack([data["data_frame_I"], data["data_frame_Q"]], axis=1)
             train_len = int(data.shape[0] * self.train_split)
@@ -75,7 +77,7 @@ class Contrastive_data(Dataset):
             data_past = self.data[index:index+self.past_steps, :, :]
             data_future = self.data[index+self.past_steps:index+self.time_len, :, :]
         
-        return data_past, data_future
+        return np.nan_to_num(data_past, nan=0.), np.nan_to_num(data_future, nan=0.)
     
     @staticmethod
     def collate_fn(batch):

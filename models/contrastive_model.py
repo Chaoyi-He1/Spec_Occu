@@ -38,6 +38,24 @@ def _get_activation_fn(activation):
     raise RuntimeError(F"activation should be relu/gelu, not {activation}.")
 
 
+def calculate_conv1d_padding(stride, kernel_size, d_in, d_out):
+    """
+    Calculate the padding value for a 1D convolutional layer.
+
+    Args:
+        stride (int): Stride value for the convolution.
+        kernel_size (int): Kernel size of the convolution.
+        d_in (int): Input dimension of the convolutional layer.
+        d_out (int): Output dimension of the convolutional layer.
+
+    Returns:
+        int: Padding value for the convolution.
+
+    """
+    padding = ((d_out - 1) * stride + kernel_size - d_in) // 2
+    return int(padding)
+
+
 class Conv1d_BN_Relu(nn.Sequential):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1):
         super(Conv1d_BN_Relu, self).__init__(
@@ -51,10 +69,12 @@ class Conv1d_BN_Relu(nn.Sequential):
 
 
 class ResBlock(nn.Module):
-    def __init__(self, in_channel: int, kernel_size: int = 3, drop_path_ratio: float = 0.4) -> None:
+    def __init__(self, in_channel: int, kernel_size: int = 3, stride: int = 1, in_dim: int = 512,
+                 drop_path_ratio: float = 0.4) -> None:
         super(ResBlock, self).__init__()
+        pad = calculate_conv1d_padding(stride, kernel_size, in_dim, in_dim)
         self.conv1 = Conv1d_BN_Relu(in_channel, in_channel // 2, kernel_size=1)
-        self.conv2 = Conv1d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, padding=kernel_size // 2)
+        self.conv2 = Conv1d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, padding=pad)
         self.drop_path = DropPath(drop_path_ratio) if drop_path_ratio > 0 else nn.Identity()
     
     def forward(self, x: Tensor) -> Tensor:
@@ -73,13 +93,15 @@ class Conv1d_AutoEncoder(nn.Module):
         self.temp_dim //= 2
 
         self.ResNet = nn.ModuleList()
-        res_params = res_params = list(zip([1, 2, 8, 8, 4], [11, 9, 5, 5, 5])) # num_blocks, kernel_size
+        res_params = res_params = list(zip([1, 2, 8, 8, 4], [11, 9, 5, 5, 5], [16, 8, 4, 4, 2])) # num_blocks, kernel_size, stride
         # final channels = 512; final temp_dim = in_dim // (2^5) = in_dim // 32
-        for i, (num_blocks, kernel_size) in enumerate(res_params):
-            self.ResNet.extend([ResBlock(self.channel, kernel_size, drop_path) for _ in range(num_blocks)])
+        for i, (num_blocks, kernel_size, stride) in enumerate(res_params):
+            self.ResNet.extend([ResBlock(self.channel, kernel_size, drop_path, stride, self.temp_dim) 
+                                for _ in range(num_blocks)])
             if i != len(res_params) - 1:
+                pad = calculate_conv1d_padding(stride, kernel_size, self.temp_dim, self.temp_dim // 2)
                 self.ResNet.append(Conv1d_BN_Relu(self.channel, self.channel * 2, 
-                                                  kernel_size, stride=2, padding=kernel_size // 2))
+                                                  kernel_size, stride=2, padding=pad))
                 self.channel *= 2
                 self.temp_dim //= 2
         
@@ -187,7 +209,7 @@ class Autoregressive(nn.Module):
             src = block(src, src_key_padding_mask, pos_embed)
         src = src.flatten(1)
         src = self.feature_layer(src)
-        src = self.norm(src)
+        # src = self.norm(src)
         return src
 
 
