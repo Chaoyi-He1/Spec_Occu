@@ -64,7 +64,7 @@ class Conv1d_BN_Relu(nn.Sequential):
             nn.BatchNorm1d(out_channels),
             nn.ReLU(inplace=True)
         )
-    
+
     def forward(self, x: Tensor) -> Tensor:
         return super(Conv1d_BN_Relu, self).forward(x)
 
@@ -77,7 +77,7 @@ class ResBlock(nn.Module):
         self.conv1 = Conv1d_BN_Relu(in_channel, in_channel // 2, kernel_size=1)
         self.conv2 = Conv1d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, padding=pad, stride=stride)
         self.drop_path = DropPath(drop_path_ratio) if drop_path_ratio > 0 else nn.Identity()
-    
+
     def forward(self, x: Tensor) -> Tensor:
         return x + self.drop_path(self.conv2(self.conv1(x)))
 
@@ -96,21 +96,21 @@ class Conv1d_AutoEncoder(nn.Module):
         self.temp_dim //= 2
 
         self.ResNet = nn.ModuleList()
-        res_params = res_params = list(zip([1, 2, 8, 8, 4], [13, 11, 7, 3, 3], [5, 5, 3, 3, 3])) # num_blocks, kernel_size, stride
+        res_params = list(zip([1, 2, 8, 8, 4], [13, 11, 7, 3, 3], [5, 5, 3, 3, 3]))  # num_blocks, kernel_size, stride
         # final channels = 512; final temp_dim = in_dim // (2^5) = in_dim // 32
         for i, (num_blocks, kernel_size, stride) in enumerate(res_params):
-            self.ResNet.extend([ResBlock(self.channel, kernel_size, stride, self.temp_dim, drop_path) 
+            self.ResNet.extend([ResBlock(self.channel, kernel_size, stride, self.temp_dim, drop_path)
                                 for _ in range(num_blocks)])
             if i != len(res_params) - 1:
                 pad = calculate_conv1d_padding(stride, kernel_size, self.temp_dim, self.temp_dim // 2)
-                self.ResNet.append(Conv1d_BN_Relu(self.channel, self.channel * 2, 
+                self.ResNet.append(Conv1d_BN_Relu(self.channel, self.channel * 2,
                                                   kernel_size, stride=stride, padding=pad))
                 self.channel *= 2
                 self.temp_dim //= 2
-        
+
         self.avgpool = nn.AdaptiveAvgPool1d(1)
         self._reset_parameters()
-    
+
     def _reset_parameters(self):
         for p in self.parameters():
             if p.dim() > 1:
@@ -120,7 +120,7 @@ class Conv1d_AutoEncoder(nn.Module):
         # inputs: [L, 2, in_dim], 
         # L is the sequence_length in the following Transformer based AutoRegressive model
         # output: [L, Embedding], Embedding = 512
-        
+
         # assert inputs.shape[1] == 2 and len(inputs.shape) == 3, "Input shape should be [B, 2, Embedding]"
 
         x = self.conv1(inputs)
@@ -129,7 +129,7 @@ class Conv1d_AutoEncoder(nn.Module):
             x = block(x)
         x = self.avgpool(x)
         return x.squeeze(-1)
-        
+
 
 class TransEncoder_Conv1d_Act_block(nn.Module):
     def __init__(self, num_layers=4, d_model=512, nhead=8, dim_feedforward=512, dropout=0.1,
@@ -140,12 +140,12 @@ class TransEncoder_Conv1d_Act_block(nn.Module):
         encoder_norm = nn.LayerNorm(d_model) if normalize_before else None
         self.encoder = Transformer_Encoder(num_layers=num_layers, norm=encoder_norm, d_model=d_model,
                                            nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout,
-                                           drop_path=drop_path, activation=activation, 
+                                           drop_path=drop_path, activation=activation,
                                            normalize_before=normalize_before)
-        self.conv1d = nn.Conv1d(in_channels=sequence_length, out_channels=sequence_length, 
+        self.conv1d = nn.Conv1d(in_channels=sequence_length, out_channels=sequence_length,
                                 kernel_size=kernel, stride=2, padding=kernel // 2)
         self.activation = _get_activation_fn(activation)
-    
+
     def forward(self, src: Tensor,
                 src_key_padding_mask: Optional[Tensor] = None,
                 pos_embed: Optional[Tensor] = None) -> Tensor:
@@ -163,7 +163,7 @@ class Autoregressive(nn.Module):
                  drop_path=0.4, activation="relu", normalize_before=True,
                  kernel=7, sequence_length=32) -> None:
         super(Autoregressive, self).__init__()
-        
+
         block_params = {
             "num_layers": num_layers,
             "d_model": d_model,
@@ -181,7 +181,7 @@ class Autoregressive(nn.Module):
         self.pos_embeds = []
         for _ in range(num_blocks):
             block_list.append(TransEncoder_Conv1d_Act_block(**block_params))
-            self.pos_embeds.append(build_position_encoding(type=pos_type, 
+            self.pos_embeds.append(build_position_encoding(type=pos_type,
                                                            embed_dim=block_params["d_model"]))
             block_params["d_model"] //= 2
 
@@ -193,7 +193,7 @@ class Autoregressive(nn.Module):
         self.norm = _get_activation_fn("tanh")
 
         self._reset_parameters()
-    
+
     def _reset_parameters(self):
         for p in self.parameters():
             if p.dim() > 1 and p.requires_grad:
@@ -227,7 +227,8 @@ class Encoder_Regressor(nn.Module):
         }
         self.encoder = Conv1d_AutoEncoder(**self.AutoEncoder_cfg)
         self.embed_dim = self.encoder.channel
-        assert self.embed_dim == cfg["contrast_embed_dim"], "embed_dim should be the same as the output of Conv1d_AutoEncoder"
+        assert self.embed_dim == cfg["contrast_embed_dim"], \
+            "embed_dim should be the same as the output of Conv1d_AutoEncoder"
 
         self.AutoRegressive_cfg = {
             "num_blocks": cfg["num_contrast_blocks"],
@@ -245,13 +246,13 @@ class Encoder_Regressor(nn.Module):
 
         self.timestep = timestep
         self.feature_dim = cfg["feature_dim"]
-        self.linear_trans  = nn.parameter.Parameter(torch.randn(self.timestep, self.embed_dim, self.feature_dim))
+        self.linear_trans = nn.parameter.Parameter(torch.randn(self.timestep, self.embed_dim, self.feature_dim))
 
     def forward(self, inputs: Tensor) -> Tensor:
         # inputs: [B, L, in_dim]; 
         # B is the batch size; L is the sequence length, in_dim is the input temporal dimension
         # output: [B, feature_dim]
-        
+
         b, l, c, t_d = inputs.shape
         device = inputs.device
         # assert t_d == self.AutoEncoder_cfg["in_dim"], \
@@ -259,17 +260,18 @@ class Encoder_Regressor(nn.Module):
         # assert c == self.encoder.in_channel, \
         #     "Input channel should be the same as the in_channel in AutoEncoder"
         encoder_outputs = torch.stack([self.encoder(inputs[i, :, :, :])
-                                        for i in range(b)]).to(device)
+                                       for i in range(b)]).to(device)
         # assert encoder_outputs.shape == (b, l, self.embed_dim), \
         #     "Encoder output shape should be [B, L, Embedding]"
-        
-        feature = self.regressor(encoder_outputs)   # [B, feature_dim]
+
+        feature = self.regressor(encoder_outputs)  # [B, feature_dim]
         # pred: [time_step, B, embed_dim, 1]
         pred = torch.matmul(self.linear_trans.unsqueeze(1), feature.unsqueeze(2))
         # assert pred.shape == (self.timestep, b, self.embed_dim, 1), \
         #     "pred shape should be [time_step, B, embed_dim, 1]"
-        
+
         return pred.squeeze(-1)
+
 
 def build_contrastive_model(cfg: dict = None, timestep: int = 12, pos_type: str = "sine") -> nn.Module:
     return Encoder_Regressor(cfg, timestep, pos_type)

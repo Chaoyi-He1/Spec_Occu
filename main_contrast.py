@@ -40,7 +40,8 @@ def get_args_parser():
     parser.add_argument('--resume', type=str, default='', help="initial weights path")
     parser.add_argument('--time-step', type=int, default=12, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
-    parser.add_argument('--positional-embedding', default='sine', choices=('sine', 'learned'), help="type of positional embedding to use on top of the image features")
+    parser.add_argument('--positional-embedding', default='sine', choices=('sine', 'learned'),
+                        help="type of positional embedding to use on top of the image features")
     parser.add_argument('--sync-bn', action='store_true', help='enabling apex sync BN.')
     parser.add_argument('--freeze-encoder', action='store_true', help="freeze the encoder")
     parser.add_argument('--save-best', action='store_true', help="save best model")
@@ -71,8 +72,10 @@ def get_args_parser():
 def main(args):
     utils.init_distributed_mode(args)
     if args.amp:
-        assert torch.backends.cudnn.enabled, "NVIDIA Apex extension is not available. Please check environment and/or dependencies."
-        assert torch.backends.cudnn.version() >= 7603, "NVIDIA Apex extension is outdated. Please update Apex extension."
+        assert torch.backends.cudnn.enabled, \
+            "NVIDIA Apex extension is not available. Please check environment and/or dependencies."
+        assert torch.backends.cudnn.version() >= 7603, \
+            "NVIDIA Apex extension is outdated. Please update Apex extension."
     if args.rank in [-1, 0]:
         print(args)
 

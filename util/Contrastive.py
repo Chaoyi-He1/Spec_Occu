@@ -11,13 +11,13 @@ def Freq_Similarity(Targets: torch.Tensor):
     :return: Tensor
     """
     b, l, n = Targets.shape
-    
+
     # Reshape the Targets tensor for efficient comparison
     reshaped_targets = Targets.view(b, -1)
-    
+
     # Calculate the frequency similarity using matrix multiplication
     similarity_mtx = reshaped_targets @ reshaped_targets.t()
-    
+
     # Set the diagonal elements to zero
     similarity_mtx.diagonal().zero_()
 
@@ -30,6 +30,7 @@ class ContrastiveLoss(nn.Module):
     Based on: Representation Learning with Contrastive Predictive Coding
     (CPC) https://arxiv.org/pdf/1807.03748.pdf
     """
+
     def __init__(self, time_step_weights: list = None):
         # time_step_weights: list, the weights for each time step loss
         super(ContrastiveLoss, self).__init__()
@@ -63,26 +64,26 @@ class ContrastiveLoss(nn.Module):
         assert c == model.module.AutoEncoder_cfg["in_channel"], \
             "Input channels should be the same as the in_channels in AutoEncoder"
         assert len(self.weights) == l, "time_step_weights length should be the same as time_step"
-            
+
         # Calculate the true futures (targets) encoded features (embed vectors)
         # encoded_targets: [B, time_step, embed_dim]
-            
+
         encoded_targets = torch.stack([model.module.encoder(targets[i, :, :, :])
-                                        for i in range(b)]).to(device)
+                                       for i in range(b)]).to(device)
         encoded_targets = encoded_targets.permute(1, 0, 2).contiguous()
         ##---------------------------------------------------------##
 
         # Calculate the loss
         # pred: [time_step, B, \hat{embed_dim}]; encoded_targets: [time_step, B, embed_dim]
         # mutural_info: [time_step, B, \hat{B}]
-        
+
         mutural_info = torch.matmul(encoded_targets, torch.transpose(pred, 1, 2))
         NCELoss = -torch.sum(torch.diagonal(self.lsoftmax(mutural_info), dim1=-2, dim2=-1) * self.weights)
         NCELoss /= l * b
         cls_prd = torch.sum(torch.eq(torch.argmax(self.softmax(mutural_info), dim=-1),
-                           torch.arange(b).unsqueeze(0).to(device))).float()
+                                     torch.arange(b).unsqueeze(0).to(device))).float()
         steps_cls_prd = torch.sum(torch.eq(torch.argmax(self.softmax(mutural_info), dim=-1),
-                            torch.arange(b).unsqueeze(0).to(device)), dim=1).float()
+                                           torch.arange(b).unsqueeze(0).to(device)), dim=1).float()
         cls_prd /= l * b
         steps_cls_prd /= b
 
