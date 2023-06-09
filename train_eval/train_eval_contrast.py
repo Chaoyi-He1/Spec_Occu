@@ -36,11 +36,19 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         # Backward
         optimizer.zero_grad()
         if scaler is not None:
-            scaler.scale(infoNCELoss_reduced).backward()
+            scaler.scale(infoNCELoss).backward()
+        else:
+            infoNCELoss.backward()
+        
+        if max_norm > 0:
+            if scaler is not None:
+                scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+        
+        if scaler is not None:
             scaler.step(optimizer)
             scaler.update()
         else:
-            infoNCELoss_reduced.backward()
             optimizer.step()
         
         # Update metric

@@ -53,6 +53,7 @@ def calculate_conv1d_padding(stride, kernel_size, d_in, d_out):
 
     """
     padding = ((d_out - 1) * stride + kernel_size - d_in) // 2
+    assert padding >= 0, "padding should be a positive integer."
     return int(padding)
 
 
@@ -74,7 +75,7 @@ class ResBlock(nn.Module):
         super(ResBlock, self).__init__()
         pad = calculate_conv1d_padding(stride, kernel_size, in_dim, in_dim)
         self.conv1 = Conv1d_BN_Relu(in_channel, in_channel // 2, kernel_size=1)
-        self.conv2 = Conv1d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, padding=pad)
+        self.conv2 = Conv1d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, padding=pad, stride=stride)
         self.drop_path = DropPath(drop_path_ratio) if drop_path_ratio > 0 else nn.Identity()
     
     def forward(self, x: Tensor) -> Tensor:
@@ -87,21 +88,23 @@ class Conv1d_AutoEncoder(nn.Module):
         self.in_channel = in_channel
         self.temp_dim = in_dim
         self.channel = 16
-        self.conv1 = Conv1d_BN_Relu(self.in_channel, self.channel, kernel_size=13, padding=13 // 2)
-        self.conv2 = Conv1d_BN_Relu(self.channel, self.channel * 2, kernel_size=13, stride=2, padding=11 // 2)
+        pad = calculate_conv1d_padding(1, 11, self.temp_dim, self.temp_dim)
+        self.conv1 = Conv1d_BN_Relu(self.in_channel, self.channel, kernel_size=11, padding=pad)
+        pad = calculate_conv1d_padding(2, 13, self.temp_dim, self.temp_dim // 2)
+        self.conv2 = Conv1d_BN_Relu(self.channel, self.channel * 2, kernel_size=12, stride=2, padding=pad)
         self.channel *= 2
         self.temp_dim //= 2
 
         self.ResNet = nn.ModuleList()
-        res_params = res_params = list(zip([1, 2, 8, 8, 4], [11, 9, 5, 5, 5], [16, 8, 4, 4, 2])) # num_blocks, kernel_size, stride
+        res_params = res_params = list(zip([1, 2, 8, 8, 4], [13, 11, 7, 3, 3], [5, 5, 3, 3, 3])) # num_blocks, kernel_size, stride
         # final channels = 512; final temp_dim = in_dim // (2^5) = in_dim // 32
         for i, (num_blocks, kernel_size, stride) in enumerate(res_params):
-            self.ResNet.extend([ResBlock(self.channel, kernel_size, drop_path, stride, self.temp_dim) 
+            self.ResNet.extend([ResBlock(self.channel, kernel_size, stride, self.temp_dim, drop_path) 
                                 for _ in range(num_blocks)])
             if i != len(res_params) - 1:
                 pad = calculate_conv1d_padding(stride, kernel_size, self.temp_dim, self.temp_dim // 2)
                 self.ResNet.append(Conv1d_BN_Relu(self.channel, self.channel * 2, 
-                                                  kernel_size, stride=2, padding=pad))
+                                                  kernel_size, stride=stride, padding=pad))
                 self.channel *= 2
                 self.temp_dim //= 2
         
@@ -111,7 +114,7 @@ class Conv1d_AutoEncoder(nn.Module):
     def _reset_parameters(self):
         for p in self.parameters():
             if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
+                nn.init.xavier_normal_(p)
 
     def forward(self, inputs: Tensor) -> Tensor:
         # inputs: [L, 2, in_dim], 
@@ -194,7 +197,7 @@ class Autoregressive(nn.Module):
     def _reset_parameters(self):
         for p in self.parameters():
             if p.dim() > 1 and p.requires_grad:
-                nn.init.xavier_uniform_(p)
+                nn.init.xavier_normal_(p)
 
     def forward(self, src: Tensor,
                 src_key_padding_mask: Tensor = None) -> Tensor:
@@ -248,7 +251,7 @@ class Encoder_Regressor(nn.Module):
         # inputs: [B, L, in_dim]; 
         # B is the batch size; L is the sequence length, in_dim is the input temporal dimension
         # output: [B, feature_dim]
-
+        
         b, l, c, t_d = inputs.shape
         device = inputs.device
         # assert t_d == self.AutoEncoder_cfg["in_dim"], \
