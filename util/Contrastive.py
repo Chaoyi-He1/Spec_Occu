@@ -37,7 +37,8 @@ class ContrastiveLoss(nn.Module):
         assert time_step_weights is not None, "time_step_weights must be provided as a list"
         self.weights = torch.tensor(time_step_weights).view(-1, 1)
         self.softmax = nn.Softmax(dim=-1)
-        self.lsoftmax = nn.LogSoftmax(dim=-1)
+        self.lsoftmax_pred = nn.LogSoftmax(dim=-1)
+        self.lsoftmax_targets = nn.LogSoftmax(dim=-2)
 
     def forward(self, pred: Tensor, targets: Tensor, model: nn.Module):
         """
@@ -53,24 +54,24 @@ class ContrastiveLoss(nn.Module):
         self.weights = self.weights.to(pred.device)
 
         ##----------------- With or withour grad -----------------##
-        # with torch.no_grad():
-        b, l, c, t_d = targets.shape
-        device = targets.device
+        with torch.no_grad():
+            b, l, c, t_d = targets.shape
+            device = targets.device
 
-        assert pred.shape == (l, b, model.module.embed_dim), \
-            "pred shape should be [time_step, B, embed_dim]"
-        assert t_d == model.module.AutoEncoder_cfg["in_dim"], \
-            "Input temporal dimension should be the same as the in_dim in AutoEncoder"
-        assert c == model.module.AutoEncoder_cfg["in_channel"], \
-            "Input channels should be the same as the in_channels in AutoEncoder"
-        assert len(self.weights) == l, "time_step_weights length should be the same as time_step"
+            assert pred.shape == (l, b, model.module.embed_dim), \
+                "pred shape should be [time_step, B, embed_dim]"
+            assert t_d == model.module.AutoEncoder_cfg["in_dim"], \
+                "Input temporal dimension should be the same as the in_dim in AutoEncoder"
+            assert c == model.module.AutoEncoder_cfg["in_channel"], \
+                "Input channels should be the same as the in_channels in AutoEncoder"
+            assert len(self.weights) == l, "time_step_weights length should be the same as time_step"
 
-        # Calculate the true futures (targets) encoded features (embed vectors)
-        # encoded_targets: [B, time_step, embed_dim]
+            # Calculate the true futures (targets) encoded features (embed vectors)
+            # encoded_targets: [B, time_step, embed_dim]
 
-        encoded_targets = torch.stack([model.module.encoder(targets[i, :, :, :])
-                                       for i in range(b)]).to(device)
-        encoded_targets = encoded_targets.permute(1, 0, 2).contiguous()
+            encoded_targets = torch.stack([model.module.encoder(targets[i, :, :, :])
+                                        for i in range(b) ]).to(device)
+            encoded_targets = encoded_targets.permute(1, 0, 2).contiguous()
         ##---------------------------------------------------------##
 
         # Calculate the loss
@@ -78,7 +79,8 @@ class ContrastiveLoss(nn.Module):
         # mutural_info: [time_step, B, \hat{B}]
 
         mutural_info = torch.matmul(encoded_targets, torch.transpose(pred, 1, 2))
-        NCELoss = -torch.sum(torch.diagonal(self.lsoftmax(mutural_info), dim1=-2, dim2=-1) * self.weights)
+        NCELoss = -torch.sum(torch.diagonal(self.lsoftmax_pred(mutural_info), dim1=-2, dim2=-1) * self.weights) \
+                  - torch.sum(torch.diagonal(self.lsoftmax_targets(mutural_info), dim1=-2, dim2=-1) * self.weights)
         NCELoss /= l * b
         cls_prd = torch.sum(torch.eq(torch.argmax(self.softmax(mutural_info), dim=-1),
                                      torch.arange(b).unsqueeze(0).to(device))).float()

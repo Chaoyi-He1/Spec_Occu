@@ -82,7 +82,22 @@ class Contrastive_data(Dataset):
     @staticmethod
     def collate_fn(batch):
         data_past, data_future = list(zip(*batch))
-        return torch.tensor(np.array(data_past)).float(), torch.tensor(np.array(data_future)).float()
+        data_past = torch.tensor(np.array(data_past)).float()
+        data_future = torch.tensor(np.array(data_future)).float()
+
+        data_past_c = data_past[:, :, 0, :] + 1j * data_past[:, :, 1, :]
+        data_future_c = data_future[:, :, 0, :] + 1j * data_future[:, :, 1, :]
+
+        data_past_f = torch.fft.fft(data_past_c, dim=-1)
+        data_future_f = torch.fft.fft(data_future_c, dim=-1)
+
+        data_past_f = torch.stack([data_past_f.real, data_past_f.imag], dim=2)
+        data_future_f = torch.stack([data_future_f.real, data_future_f.imag], dim=2)
+
+        data_past = torch.cat([data_past, data_past_f], dim=2)
+        data_future = torch.cat([data_future_f, data_future_f], dim=2)
+
+        return data_past, data_future
 
 class Temporal_to_Freq_data(Dataset):
     def __init__(self, data_path: str = "", cache_data: bool = True, 

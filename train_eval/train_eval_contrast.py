@@ -7,7 +7,7 @@ from typing import Iterable
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
-                    device: torch.device, epoch: int, max_norm: float = 1.0,
+                    device: torch.device, epoch: int, max_norm: float = .1,
                     scaler=None, steps: int = 12):
     model.train()
     criterion.train()
@@ -19,7 +19,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     metric_logger.add_meter('lr', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
     
-    for i, (past, future) in enumerate(metric_logger.log_every(data_loader, 1000, header)):
+    for i, (past, future) in enumerate(metric_logger.log_every(data_loader, 200, header)):
         past = past.to(device)
         future = future.to(device)
         
@@ -27,6 +27,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             pred_embed_future = model(past)    #pred_embed_future: [time_step, B, feature_dim]
             infoNCELoss, cls_pred, steps_cls_pred = criterion(pred_embed_future, future, model)
+
+        if torch.isnan(infoNCELoss):
+            raise ValueError('NaN loss detected')
             
         # reduce losses over all GPUs for logging purposes
         infoNCELoss_reduced = reduce_loss(infoNCELoss)
@@ -41,8 +44,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             infoNCELoss.backward()
         
         if max_norm > 0:
-            if scaler is not None:
-                scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
         
         if scaler is not None:
@@ -89,6 +90,9 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module,
         # Compute the output
         pred_embed = model(past)    #pred_embed: [time_step, B, feature_dim]
         infoNCELoss, cls_pred, steps_cls_pred = criterion(pred_embed, future, model)
+
+        if torch.isnan(infoNCELoss):
+            raise ValueError('NaN loss detected')
         
         # reduce losses over all GPUs for logging purposes
         infoNCELoss_reduced = reduce_loss(infoNCELoss)

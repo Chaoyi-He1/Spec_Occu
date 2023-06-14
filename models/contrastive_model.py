@@ -38,22 +38,22 @@ def _get_activation_fn(activation):
     raise RuntimeError(F"activation should be relu/gelu, not {activation}.")
 
 
-def calculate_conv1d_padding(stride, kernel_size, d_in, d_out):
+def calculate_conv1d_padding(stride, kernel_size, d_in, d_out, dilation=1):
     """
-    Calculate the padding value for a 1D convolutional layer.
+    Calculate the padding value for a 1D convolutional layer with dilation.
 
     Args:
         stride (int): Stride value for the convolution.
         kernel_size (int): Kernel size of the convolution.
         d_in (int): Input dimension of the convolutional layer.
         d_out (int): Output dimension of the convolutional layer.
+        dilation (int, optional): Dilation value for the convolution. Default is 1.
 
     Returns:
         int: Padding value for the convolution.
 
     """
-    padding = ((d_out - 1) * stride + kernel_size - d_in) // 2
-    assert padding >= 0, "padding should be a positive integer."
+    padding = (((d_out - 1) * stride) + (kernel_size - 1) * dilation - d_in) // 2
     return int(padding)
 
 
@@ -71,11 +71,12 @@ class Conv1d_BN_Relu(nn.Sequential):
 
 class ResBlock(nn.Module):
     def __init__(self, in_channel: int, kernel_size: int = 3, stride: int = 1, in_dim: int = 512,
-                 drop_path_ratio: float = 0.4) -> None:
+                 dilation: int = 1, drop_path_ratio: float = 0.4) -> None:
         super(ResBlock, self).__init__()
-        pad = calculate_conv1d_padding(stride, kernel_size, in_dim, in_dim)
+        pad = calculate_conv1d_padding(stride, kernel_size, in_dim, in_dim, dilation)
         self.conv1 = Conv1d_BN_Relu(in_channel, in_channel // 2, kernel_size=1)
-        self.conv2 = Conv1d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, padding=pad, stride=stride)
+        self.conv2 = Conv1d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, 
+                                    padding=pad, stride=stride, dilation=dilation)
         self.drop_path = DropPath(drop_path_ratio) if drop_path_ratio > 0 else nn.Identity()
 
     def forward(self, x: Tensor) -> Tensor:
@@ -96,10 +97,12 @@ class Conv1d_AutoEncoder(nn.Module):
         self.temp_dim //= 2
 
         self.ResNet = nn.ModuleList()
-        res_params = list(zip([1, 2, 8, 8, 4], [11, 11, 7, 3, 3], [5, 5, 3, 3, 3]))  # num_blocks, kernel_size, stride
+        res_params = list(zip([1, 2, 8, 8, 4], [3, 3, 5, 7, 9], 
+                              [7, 5, 5, 3, 3], [7, 5, 5, 3, 3]))  # num_blocks, kernel_size, stride, dilation
         # final channels = 512; final temp_dim = in_dim // (2^5) = in_dim // 32
-        for i, (num_blocks, kernel_size, stride) in enumerate(res_params):
-            self.ResNet.extend([ResBlock(self.channel, kernel_size, stride, self.temp_dim, drop_path)
+        for i, (num_blocks, kernel_size, stride, dilation) in enumerate(res_params):
+            self.ResNet.extend([ResBlock(self.channel, kernel_size, stride, self.temp_dim, dilation,
+                                         drop_path)
                                 for _ in range(num_blocks)])
             if i != len(res_params) - 1:
                 pad = calculate_conv1d_padding(stride, kernel_size, self.temp_dim, self.temp_dim // 2)
@@ -160,7 +163,7 @@ class TransEncoder_Conv1d_Act_block(nn.Module):
 class Autoregressive(nn.Module):
     def __init__(self, num_blocks=3, feature_dim=256, pos_type="sine",
                  num_layers=4, d_model=512, nhead=8, dim_feedforward=512, dropout=0.1,
-                 drop_path=0.4, activation="relu", normalize_before=True,
+                 drop_path=0.4, activation="gelu", normalize_before=True,
                  kernel=7, sequence_length=32) -> None:
         super(Autoregressive, self).__init__()
 
@@ -216,6 +219,47 @@ class Autoregressive(nn.Module):
         return src
 
 
+class Autoregressive_Attention(nn.Module):
+    def __init__(self, feature_dim=256, pos_type="sine", num_layers=4, 
+                 d_model=512, nhead=8, dim_feedforward=1024, dropout=0.1,
+                 drop_path=0.4, activation="gelu", normalize_before=True,
+                 sequence_length=32) -> None:
+        super(Autoregressive_Attention, self).__init__()
+
+        encoder_params = {
+            "num_layers": num_layers,
+            "d_model": d_model,
+            "nhead": nhead,
+            "dim_feedforward": dim_feedforward,
+            "dropout": dropout,
+            "drop_path": drop_path,
+            "activation": activation,
+            "normalize_before": normalize_before,
+        }
+        
+        self.atten_encoder = Transformer_Encoder(**encoder_params)
+        self.pos_embed = build_position_encoding(type=pos_type, embed_dim=d_model)
+        self.embed_dim = d_model
+        self.sequence_length = sequence_length
+
+        self.feature_layer = nn.Linear(self.embed_dim * self.sequence_length, feature_dim)
+    
+    def forward(self, src: Tensor,
+                src_key_padding_mask: Tensor = None) -> Tensor:
+        """
+        Parameters:
+            src: [B, L, Embedding]
+            src_key_padding_mask: [B, L], to mask out the padding part
+            pos_embed: [B, L, Embedding]
+        """
+        pos_embed = self.pos_embed(src)
+        src = self.atten_encoder(src=src, src_key_padding_mask=src_key_padding_mask, 
+                                 pos=pos_embed)
+        src = src.flatten(1)
+        src = self.feature_layer(src)
+        return src
+
+
 class Encoder_Regressor(nn.Module):
     def __init__(self, cfg: dict = None, timestep: int = 12, pos_type: str = "sine") -> None:
         super(Encoder_Regressor, self).__init__()
@@ -229,20 +273,37 @@ class Encoder_Regressor(nn.Module):
         self.embed_dim = self.encoder.channel
         assert self.embed_dim == cfg["contrast_embed_dim"], \
             "embed_dim should be the same as the output of Conv1d_AutoEncoder"
+        
+        if not cfg["contrast_attention"]:
+            self.AutoRegressive_cfg = {
+                "num_blocks": cfg["num_contrast_blocks"],
+                "feature_dim": cfg["feature_dim"],
+                "num_layers": cfg["num_contrast_layers"],
+                "d_model": self.embed_dim,
+                "nhead": cfg["nhead"],
+                "dropout": cfg["dropout"],
+                "drop_path": cfg["drop_path"],
+                "sequence_length": cfg["contrast_sequence_length"],
+                "dim_feedforward": cfg["dim_feedforward"],
+                "normalize_before": cfg["contrast_normalize_before"],
+                "pos_type": pos_type,
+            }
+        else:
+            self.AutoRegressive_cfg = {
+                "feature_dim": cfg["feature_dim"],
+                "num_layers": cfg["num_contrast_layers"],
+                "d_model": self.embed_dim,
+                "nhead": cfg["nhead"],
+                "dropout": cfg["dropout"],
+                "drop_path": cfg["drop_path"],
+                "sequence_length": cfg["contrast_sequence_length"],
+                "dim_feedforward": cfg["dim_feedforward"],
+                "normalize_before": cfg["contrast_normalize_before"],
+                "pos_type": pos_type,
+            }
 
-        self.AutoRegressive_cfg = {
-            "num_blocks": cfg["num_contrast_blocks"],
-            "feature_dim": cfg["feature_dim"],
-            "num_layers": cfg["num_contrast_layers"],
-            "d_model": self.embed_dim,
-            "nhead": cfg["nhead"],
-            "dropout": cfg["dropout"],
-            "drop_path": cfg["drop_path"],
-            "sequence_length": cfg["contrast_sequence_length"],
-            "dim_feedforward": cfg["dim_feedforward"],
-            "pos_type": pos_type,
-        }
-        self.regressor = Autoregressive(**self.AutoRegressive_cfg)
+        self.regressor = Autoregressive(**self.AutoRegressive_cfg) if not cfg["contrast_attention"] else \
+                         Autoregressive_Attention(**self.AutoRegressive_cfg)
 
         self.timestep = timestep
         self.feature_dim = cfg["feature_dim"]

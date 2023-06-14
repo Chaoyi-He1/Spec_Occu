@@ -131,7 +131,7 @@ def main(args):
     
     # dataloader
     print("Contrastive dataloader generating...")
-    nw = min([os.cpu_count(), args.batch_size if args.batch_size > 1 else 0, 8])  # number of workers
+    nw = min([os.cpu_count(), args.batch_size if args.batch_size > 1 else 0, 8])  # number of wor-kers
     if args.rank in [-1, 0]:
         print('Using %g dataloader workers' % nw)
     data_loader_train = torch.utils.data.DataLoader(dataset_train, batch_sampler=batch_sampler_train, 
@@ -145,7 +145,9 @@ def main(args):
     model.to(device)
     if args.rank in [-1, 0]:
         tb_writer.add_graph(model, torch.randn((args.batch_size, 
-                                                cfg["contrast_sequence_length"], 2, cfg["Temporal_dim"]), 
+                                                cfg["contrast_sequence_length"], 
+                                                cfg["in_channels"], 
+                                                cfg["Temporal_dim"]), 
                                               device=device, dtype=torch.float), use_strict_trace=False)
     
     # load previous model if resume training
