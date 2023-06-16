@@ -290,6 +290,7 @@ class Encoder_Regressor(nn.Module):
         }
         self.encoder = Conv1d_AutoEncoder(**self.AutoEncoder_cfg)
         self.embed_dim = self.encoder.channel
+        self.frames_per_clip = cfg["num_frames_per_clip"]
         assert self.embed_dim == cfg["contrast_embed_dim"], \
             "embed_dim should be the same as the output of Conv1d_AutoEncoder"
         
@@ -333,13 +334,13 @@ class Encoder_Regressor(nn.Module):
         # B is the batch size; L is the sequence length, in_dim is the input temporal dimension
         # output: [B, feature_dim]
 
-        b, l, c, t_d = inputs.shape
+        b, l, c, f_d, t_d = inputs.shape
         device = inputs.device
         # assert t_d == self.AutoEncoder_cfg["in_dim"], \
         #     "Input temporal dimension should be the same as the in_dim in AutoEncoder"
         # assert c == self.encoder.in_channel, \
         #     "Input channel should be the same as the in_channel in AutoEncoder"
-        encoder_outputs = torch.stack([self.encoder(inputs[i, :, :, :])
+        encoder_outputs = torch.stack([self.encoder(inputs[i, :, :, :, :])
                                        for i in range(b)]).to(device)
         # assert encoder_outputs.shape == (b, l, self.embed_dim), \
         #     "Encoder output shape should be [B, L, Embedding]"
