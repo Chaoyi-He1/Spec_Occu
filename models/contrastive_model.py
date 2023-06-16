@@ -12,10 +12,11 @@ Autoregressive model is used to summarizes all z ≤ t
 in the latent space and produces a context latent representation c_t = g(z ≤ t).
 Autoregressive model is composed of Transformer encoder and conv1d layer for downsampling.
 """
-from typing import Optional
+from typing import Optional, Tuple, List
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
+import math
 
 from .transformer import Transformer_Encoder, Transformer_Decoder, DropPath
 from .positional_embedding import build_position_encoding
@@ -38,44 +39,60 @@ def _get_activation_fn(activation):
     raise RuntimeError(F"activation should be relu/gelu, not {activation}.")
 
 
-def calculate_conv1d_padding(stride, kernel_size, d_in, d_out, dilation=1):
+def calculate_conv2d_padding(stride, kernel_size, d_in, d_out, dilation=1):
     """
-    Calculate the padding value for a 1D convolutional layer with dilation.
-
-    Args:
-        stride (int): Stride value for the convolution.
-        kernel_size (int): Kernel size of the convolution.
-        d_in (int): Input dimension of the convolutional layer.
-        d_out (int): Output dimension of the convolutional layer.
-        dilation (int, optional): Dilation value for the convolution. Default is 1.
-
+    Calculate the padding value for a 2D convolutional layer.
+    
+    Arguments:
+    - stride (int or tuple): The stride value(s) for the convolution.
+    - kernel_size (int or tuple): The size of the convolutional kernel.
+    - d_in (tuple): The input dimensions (height, width) of the feature map.
+    - d_out (tuple): The output dimensions (height, width) of the feature map.
+    - dilation (int or tuple): The dilation value(s) for the convolution. Default is 1.
+    
     Returns:
-        int: Padding value for the convolution.
-
+    - padding (tuple): The padding value(s) (padding_h, padding_w) for the convolution.
     """
-    padding = (((d_out - 1) * stride) + (kernel_size - 1) * dilation - d_in) // 2
-    return int(padding)
+    if isinstance(stride, int):
+        stride = (stride, stride)
+    if isinstance(kernel_size, int):
+        kernel_size = (kernel_size, kernel_size)
+    if isinstance(dilation, int):
+        dilation = (dilation, dilation)
+
+    h_in, w_in = d_in
+    h_out, w_out = d_out
+    h_k, w_k = kernel_size
+    h_s, w_s = stride
+    h_d, w_d = dilation
+
+    padding_h = math.ceil(((h_out - 1) * h_s + h_k - h_in + (h_k - 1) * (h_d - 1)) / 2)
+    padding_w = math.ceil(((w_out - 1) * w_s + w_k - w_in + (w_k - 1) * (w_d - 1)) / 2)
+
+    padding = (padding_h, padding_w)
+    return padding
 
 
-class Conv1d_BN_Relu(nn.Sequential):
+class Conv2d_BN_Relu(nn.Sequential):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1):
-        super(Conv1d_BN_Relu, self).__init__(
-            nn.Conv1d(in_channels, out_channels, kernel_size, stride, padding, dilation),
+        super(Conv2d_BN_Relu, self).__init__(
+            nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation),
             nn.BatchNorm1d(out_channels),
             nn.ReLU(inplace=True)
         )
 
     def forward(self, x: Tensor) -> Tensor:
-        return super(Conv1d_BN_Relu, self).forward(x)
+        return super(Conv2d_BN_Relu, self).forward(x)
 
 
 class ResBlock(nn.Module):
-    def __init__(self, in_channel: int, kernel_size: int = 3, stride: int = 1, in_dim: int = 512,
-                 dilation: int = 1, drop_path_ratio: float = 0.4) -> None:
+    def __init__(self, in_channel: int, kernel_size: int = 3, stride: int = 1, 
+                 in_dim: Tuple[int, int] = (256, 1024), dilation: int = 1, 
+                 drop_path_ratio: float = 0.4) -> None:
         super(ResBlock, self).__init__()
-        pad = calculate_conv1d_padding(stride, kernel_size, in_dim, in_dim, dilation)
-        self.conv1 = Conv1d_BN_Relu(in_channel, in_channel // 2, kernel_size=1)
-        self.conv2 = Conv1d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, 
+        pad = calculate_conv2d_padding(stride, kernel_size, in_dim, in_dim, dilation)
+        self.conv1 = Conv2d_BN_Relu(in_channel, in_channel // 2, kernel_size=1)
+        self.conv2 = Conv2d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, 
                                     padding=pad, stride=stride, dilation=dilation)
         self.drop_path = DropPath(drop_path_ratio) if drop_path_ratio > 0 else nn.Identity()
 
@@ -84,17 +101,18 @@ class ResBlock(nn.Module):
 
 
 class Conv1d_AutoEncoder(nn.Module):
-    def __init__(self, in_dim: int = 512, in_channel: int = 2, drop_path: float = 0.4) -> None:
+    def __init__(self, in_dim: Tuple[int, int] = (256, 1024), 
+                 in_channel: int = 2, drop_path: float = 0.4) -> None:
         super(Conv1d_AutoEncoder, self).__init__()
         self.in_channel = in_channel
         self.temp_dim = in_dim
         self.channel = 16
-        pad = calculate_conv1d_padding(1, 11, self.temp_dim, self.temp_dim)
-        self.conv1 = Conv1d_BN_Relu(self.in_channel, self.channel, kernel_size=11, padding=pad)
-        pad = calculate_conv1d_padding(2, 13, self.temp_dim, self.temp_dim // 2)
-        self.conv2 = Conv1d_BN_Relu(self.channel, self.channel * 2, kernel_size=12, stride=2, padding=pad)
+        pad = calculate_conv2d_padding(1, 11, self.temp_dim, self.temp_dim)
+        self.conv1 = Conv2d_BN_Relu(self.in_channel, self.channel, kernel_size=11, padding=pad)
+        pad = calculate_conv2d_padding(2, 13, self.temp_dim, tuple(element // 2 for element in self.temp_dim))
+        self.conv2 = Conv2d_BN_Relu(self.channel, self.channel * 2, kernel_size=12, stride=2, padding=pad)
         self.channel *= 2
-        self.temp_dim //= 2
+        self.temp_dim = tuple(element // 2 for element in self.temp_dim)
 
         self.ResNet = nn.ModuleList()
         res_params = list(zip([1, 2, 8, 8, 4], [3, 3, 5, 7, 9], 
@@ -105,13 +123,14 @@ class Conv1d_AutoEncoder(nn.Module):
                                          drop_path)
                                 for _ in range(num_blocks)])
             if i != len(res_params) - 1:
-                pad = calculate_conv1d_padding(stride, kernel_size, self.temp_dim, self.temp_dim // 2)
-                self.ResNet.append(Conv1d_BN_Relu(self.channel, self.channel * 2,
-                                                  kernel_size, stride=stride, padding=pad))
+                pad = calculate_conv2d_padding(stride, kernel_size, self.temp_dim, 
+                                               tuple(element // 2 for element in self.temp_dim), dilation)
+                self.ResNet.append(Conv2d_BN_Relu(self.channel, self.channel * 2,
+                                                  kernel_size, stride, pad, dilation))
                 self.channel *= 2
-                self.temp_dim //= 2
+                self.temp_dim = tuple(element // 2 for element in self.temp_dim)
 
-        self.avgpool = nn.AdaptiveAvgPool1d(1)
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
         self._reset_parameters()
 
     def _reset_parameters(self):
@@ -265,7 +284,7 @@ class Encoder_Regressor(nn.Module):
         super(Encoder_Regressor, self).__init__()
         assert cfg is not None, "cfg should be a dict"
         self.AutoEncoder_cfg = {
-            "in_dim": cfg["Temporal_dim"],
+            "in_dim": (cfg["num_frames_per_clip"], cfg["Temporal_dim"]),
             "in_channel": cfg["in_channels"],
             "drop_path": cfg["drop_path"],
         }

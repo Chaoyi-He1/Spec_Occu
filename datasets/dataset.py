@@ -4,23 +4,28 @@ import h5py
 import torch
 import numpy as np
 from torch.utils.data import Dataset
+from typing import Tuple
 
 
 class Contrastive_data(Dataset):
-    def __init__(self, data_path: str = "", cache: bool = True, 
-                 past_steps: int = 32, future_steps: int = 12,
-                 train_split: float = 0.8, train: bool = True) -> None:
+    def __init__(self, data_path: str = "", cache: bool = True, past_steps: int = 32,
+                 future_steps: int = 12, train_split: float = 0.8, train: bool = True, 
+                 num_frames_per_clip: int = 256, temp_dim: int = 1024) -> None:
         super(Contrastive_data, self).__init__()
         assert os.path.isfile(data_path), "path '{}' does not exist.".format(data_path)
 
         self.data_path = data_path
         self.train_split = train_split
         self.train = train
-        self.data, self.data_len, self.train_len = self.cache_data(cache)
 
         self.future_step = future_steps
         self.past_steps = past_steps
         self.time_len = past_steps + future_steps
+
+        self.temp_dim = temp_dim
+        self.num_frames_per_clip = num_frames_per_clip
+
+        self.data, self.data_len, self.train_len = self.cache_data(cache)
     
     def h5py_to_dict(self, h5_obj):
         if isinstance(h5_obj, h5py.File) or isinstance(h5_obj, h5py.Group):
@@ -40,17 +45,23 @@ class Contrastive_data(Dataset):
         print("Loading %s data from %s ..." % ("train" if self.train else "test", self.data_path))
         with h5py.File(self.data_path, 'r') as f:
             data = self.h5py_to_dict(f)
-        for k, v in data.items():
-            data[k] = v[:100000, :]
+        # for k, v in data.items():
+        #     data[k] = v[:100000, :]
         if cache:
             data = np.stack([data["data_frame_I"], data["data_frame_Q"]], axis=1)
-            train_len = int(data.shape[0] * self.train_split)
+            train_len = int(data.shape[0] * self.train_split) 
             data = data[:train_len, :, :] if self.train else data[train_len:, :, :]
-            return data, data.shape[0], train_len
+            data = data[:-(data.shape[0] % self.num_frames_per_clip), :, :]
+
+            data = np.nan_to_num(data, nan=0.)
+            data = np.reshape(data, (-1, self.num_frames_per_clip, 2, self.temp_dim))
+            data = data.transpose(0, 2, 1, 3).copy() 
+            return data, \
+                   data.shape[0], int(train_len // self.num_frames_per_clip)
         else:
             train_len = int(data["data_frame_Q"].shape[0] * self.train_split)
             data_len = train_len if self.train else data["data_frame_I"].shape[0] - train_len
-            return None, data_len, train_len
+            return None, int(data_len // self.num_frames_per_clip), int(train_len // self.num_frames_per_clip)
 
         
     def __len__(self):
@@ -65,19 +76,27 @@ class Contrastive_data(Dataset):
             data_future is the future steps of the data to learn.
         """
         if self.data is None:
-            index = self.train_len + index if not self.train else index
+            index = (self.train_len + index) * self.num_frames_per_clip \
+                if not self.train else index * self.num_frames_per_clip
             with h5py.File(self.data_path, "r") as f:
-                real = f["data_frame_I"][index:index+self.time_len, :]
-                imag = f["data_frame_Q"][index:index+self.time_len, :]
-                data_past = np.stack([real[index:index+self.past_steps, :], 
-                                      imag[index:index+self.past_steps, :]], axis=1)
-                data_future = np.stack([real[index+self.past_steps:index+self.time_len, :],
-                                        imag[index+self.past_steps:index+self.time_len, :]], axis=1)
-        else:
-            data_past = self.data[index:index+self.past_steps, :, :]
-            data_future = self.data[index+self.past_steps:index+self.time_len, :, :]
+                real = f["data_frame_I"][index:index + 
+                                         self.time_len * self.num_frames_per_clip, :]
+                real = np.reshape(real, (self.time_len, self.num_frames_per_clip, self.temp_dim))
+                imag = f["data_frame_Q"][index:index + 
+                                         self.time_len * self.num_frames_per_clip, :]
+                imag = np.reshape(imag, (self.time_len, self.num_frames_per_clip, self.temp_dim))
+                data_past = np.stack([real[index:index+self.past_steps, :, :], 
+                                      imag[index:index+self.past_steps, :, :]], axis=1)
+                data_future = np.stack([real[index+self.past_steps:index+self.time_len, :, :],
+                                        imag[index+self.past_steps:index+self.time_len, :, :]], axis=1)
+            
+            return np.nan_to_num(data_past, nan=0.), np.nan_to_num(data_future, nan=0.)
         
-        return np.nan_to_num(data_past, nan=0.), np.nan_to_num(data_future, nan=0.)
+        else:
+            data_past = self.data[index:index+self.past_steps, :, :, :]
+            data_future = self.data[index+self.past_steps:index+self.time_len, :, :, :]
+        
+        return data_past, data_future
     
     @staticmethod
     def collate_fn(batch):
@@ -85,8 +104,8 @@ class Contrastive_data(Dataset):
         data_past = torch.tensor(np.array(data_past)).float()
         data_future = torch.tensor(np.array(data_future)).float()
 
-        data_past_c = data_past[:, :, 0, :] + 1j * data_past[:, :, 1, :]
-        data_future_c = data_future[:, :, 0, :] + 1j * data_future[:, :, 1, :]
+        data_past_c = data_past[:, :, 0, :, :] + 1j * data_past[:, :, 1, :, :]
+        data_future_c = data_future[:, :, 0, :, :] + 1j * data_future[:, :, 1, :, :]
 
         data_past_f = torch.fft.fft(data_past_c, dim=-1)
         data_future_f = torch.fft.fft(data_future_c, dim=-1)

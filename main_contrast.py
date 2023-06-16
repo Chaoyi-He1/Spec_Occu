@@ -47,7 +47,7 @@ def get_args_parser():
     parser.add_argument('--save-best', action='store_true', help="save best model")
 
     # Optimization parameters
-    parser.add_argument('--lr', default=0.0001, type=float)
+    parser.add_argument('--lr', default=0.0005, type=float)
     parser.add_argument('--lrf', default=0.01, type=float)
     parser.add_argument('--weight_decay', default=0.0, type=float)
     parser.add_argument('--epochs', default=300, type=int)
@@ -112,13 +112,17 @@ def main(args):
                                      past_steps=cfg["contrast_sequence_length"],
                                      future_steps=args.time_step,
                                      train_split=args.train_split,
-                                     train=True)
+                                     train=True,
+                                     num_frames_per_clip=cfg["num_frames_per_clip"],
+                                     temp_dim=cfg["Temporal_dim"])
     dataset_val = Contrastive_data(data_path=args.data_path,
                                    cache=args.cache_data,
                                    past_steps=cfg["contrast_sequence_length"],
                                    future_steps=args.time_step,
                                    train_split=args.train_split,
-                                   train=False)
+                                   train=False,
+                                   num_frames_per_clip=cfg["num_frames_per_clip"],
+                                   temp_dim=cfg["Temporal_dim"])
     if args.distributed:
         sampler_train = torch.utils.data.distributed.DistributedSampler(dataset_train)
         sampler_val = torch.utils.data.distributed.DistributedSampler(dataset_val, shuffle=False)
@@ -147,6 +151,7 @@ def main(args):
         tb_writer.add_graph(model, torch.randn((args.batch_size, 
                                                 cfg["contrast_sequence_length"], 
                                                 cfg["in_channels"], 
+                                                cfg["num_frames_per_clip"],
                                                 cfg["Temporal_dim"]), 
                                               device=device, dtype=torch.float), use_strict_trace=False)
     
