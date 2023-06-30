@@ -46,13 +46,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         # Compute gradient
         optimizer.zero_grad()
         if scaler is not None:
-            scaler.scale(loss_reduced).backward()
+            scaler.scale(loss).backward()
             if max_norm > 0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
             scaler.step(optimizer)
             scaler.update()
         else:
-            loss_reduced.backward()
+            loss.backward()
             if max_norm > 0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
             optimizer.step()

@@ -110,12 +110,12 @@ class Conv1d_AutoEncoder(nn.Module):
         pad = calculate_conv2d_padding(1, 11, self.temp_dim, self.temp_dim)
         self.conv1 = Conv2d_BN_Relu(self.in_channel, self.channel, kernel_size=11, padding=pad)
         pad = calculate_conv2d_padding(2, 13, self.temp_dim, tuple(element // 2 for element in self.temp_dim))
-        self.conv2 = Conv2d_BN_Relu(self.channel, self.channel * 2, kernel_size=12, stride=2, padding=pad)
+        self.conv2 = Conv2d_BN_Relu(self.channel, self.channel * 2, kernel_size=13, stride=2, padding=pad)
         self.channel *= 2
         self.temp_dim = tuple(element // 2 for element in self.temp_dim)
 
         self.ResNet = nn.ModuleList()
-        res_params = list(zip([1, 2, 8, 8, 4], [3, 3, 5, 7, 9], 
+        res_params = list(zip([1, 2, 6, 6, 4], [3, 3, 5, 7, 9], 
                               [7, 5, 5, 3, 3], [7, 5, 5, 3, 3]))  # num_blocks, kernel_size, stride, dilation
         # final channels = 512; final temp_dim = in_dim // (2^5) = in_dim // 32
         for i, (num_blocks, kernel_size, stride, dilation) in enumerate(res_params):
@@ -150,7 +150,7 @@ class Conv1d_AutoEncoder(nn.Module):
         for block in self.ResNet:
             x = block(x)
         x = self.avgpool(x)
-        return x.squeeze(-1)
+        return x.squeeze(-1).squeeze(-1)
 
 
 class TransEncoder_Conv1d_Act_block(nn.Module):
@@ -291,6 +291,7 @@ class Encoder_Regressor(nn.Module):
         self.encoder = Conv1d_AutoEncoder(**self.AutoEncoder_cfg)
         self.embed_dim = self.encoder.channel
         self.frames_per_clip = cfg["num_frames_per_clip"]
+        self.in_dim = cfg["Temporal_dim"]
         assert self.embed_dim == cfg["contrast_embed_dim"], \
             "embed_dim should be the same as the output of Conv1d_AutoEncoder"
         

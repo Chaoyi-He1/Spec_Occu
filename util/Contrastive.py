@@ -60,7 +60,7 @@ class ContrastiveLoss(nn.Module):
 
             assert pred.shape == (l, b, model.module.embed_dim), \
                 "pred shape should be [time_step, B, embed_dim]"
-            assert t_d == model.module.AutoEncoder_cfg["in_dim"], \
+            assert t_d == model.module.in_dim, \
                 "Input temporal dimension should be the same as the in_dim in AutoEncoder"
             assert f_d == model.module.frames_per_clip, \
                 "Input channels should be the same as the in_channels in AutoEncoder"

@@ -10,11 +10,11 @@ drop_path: 0.2
 contrast_embed_dim: 512  # This is fixed based on the Encoder's convolution channels
 num_contrast_blocks: 4
 feature_dim: 128
-num_contrast_layers: 6
+num_contrast_layers: 4
 nhead: 4
-contrast_sequence_length: 64 # this is the number of time frames of the history feeded to the model
+contrast_sequence_length: 32 # this is the number of time frames of the history feeded to the model
 dim_feedforward: 512
 time_step_weights: [1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]
 contrast_normalize_before: True
 contrast_attention: True    # use pure attention (True) or attention with Conv1d (False) for Auto Regressive
-num_frames_per_clip: 256    # number of frames per block for the encoder
+num_frames_per_clip: 64    # number of frames per block for the encoder
