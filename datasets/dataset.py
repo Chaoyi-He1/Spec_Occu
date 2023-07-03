@@ -320,8 +320,8 @@ class Contrastive_data_multi_env(Dataset):
             data_future is the future data.
         """
         data_past, data_future = list(zip(*batch))
-        data_past = np.concatenate(data_past, axis=0)
-        data_future = np.concatenate(data_future, axis=0)
+        data_past = np.stack(data_past, axis=0)
+        data_future = np.stack(data_future, axis=0)
         data_past = torch.from_numpy(data_past).float()
         data_future = torch.from_numpy(data_future).float()
         return data_past, data_future
