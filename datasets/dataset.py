@@ -210,7 +210,7 @@ class Contrastive_data_multi_env(Dataset):
         else:
             return h5_obj
         
-    def preprocess_data(self, h5py_data):
+    def preprocess_data(self, data):
         """
         Preprocess the data to reshape it as a 3D input for the model.
         The raw data was stored as a 2D matrix, each row represents a sampled timeframe.
@@ -222,18 +222,42 @@ class Contrastive_data_multi_env(Dataset):
         Returns:
             data: reshaped data concatenated with its FFT
         """
-        real = h5py_data["data_frame_I"]
-        imag = h5py_data["data_frame_Q"]
-        data = np.stack([real[:, np.newaxis, :], imag[:, np.newaxis, :]], axis=1)
-        data_c = real + 1j * imag
-        data_fft = np.fft.fft(data_c, axis=-1)
-        data_f_real = np.real(data_fft)
-        data_f_imag = np.imag(data_fft)
-        data = np.concatenate([data, 
-                               data_f_real[:, np.newaxis, :], 
-                               data_f_imag[:, np.newaxis, :]], axis=1)
-        data = data[:-(data.shape[0] % self.num_frames_per_clip), :, :]
-        data = data.reshape(-1, 4, self.num_frames_per_clip, self.temp_dim)
+        if isinstance(data, dict):
+            # if the data is from h5py file, it means that the data is cached,
+            # the dict contains I and Q channel, each channel is a 2D matrix
+            # with shape (num_frames, temporal_dim)
+            real = data["data_frame_I"][:25600, :].astype(np.float16)
+            imag = data["data_frame_Q"][:25600, :].astype(np.float16)
+            data = np.stack([real, imag], axis=1)
+            data_c = real + 1j * imag
+            data_fft = np.fft.fft(data_c, axis=-1)
+            data_f_real = np.real(data_fft)
+            data_f_imag = np.imag(data_fft)
+            data = np.concatenate([data, 
+                                data_f_real[:, np.newaxis, :], 
+                                data_f_imag[:, np.newaxis, :]], axis=1)
+            # data = data[:-(data.shape[0] % self.num_frames_per_clip), :, :]
+            data = data.reshape(-1, self.num_frames_per_clip, 4, self.temp_dim).\
+                   transpose(0, 2, 1, 3).astype(np.float16)
+        elif isinstance(data, np.ndarray):
+            # if the data is a numpy array, it means that the data is not cached,
+            # the data is a 4D matrix with shape (batch, num_frames, 2, temporal_dim)
+            # the data is read by __getitem__ function
+            # and the preprocessing is called by collate_fn function
+            
+            real = data[:, :, 0, :]
+            imag = data[:, :, 1, :]
+            data_c = real + 1j * imag
+            data_fft = np.fft.fft(data_c, axis=-1)
+            data_f_real = np.real(data_fft)
+            data_f_imag = np.imag(data_fft)
+            data = np.concatenate([data, 
+                                   data_f_real[:, :, np.newaxis, :], 
+                                   data_f_imag[:, :, np.newaxis, :]], axis=1)
+            data = data[:, :-(data.shape[0] % self.num_frames_per_clip), :, :]
+            b, _, _, _ = data.shape
+            data = data.reshape(b, -1, self.num_frames_per_clip, 4, self.temp_dim).\
+                   transpose(0, 1, 3, 2, 4)
         return data
     
     def cache_data(self):
@@ -261,16 +285,43 @@ class Contrastive_data_multi_env(Dataset):
     def __getitem__(self, index):
         """
         The data is stored in a folder, index is the index of the file.
-
+        If the data is cached, the data is a 4D matrix with shape (num_frames, 4, num_frames_per_clip, temp_dim)
+        If the data is not cached, the data is a dict contains I and Q channel, each channel is a 2D matrix
         Args:
             index (int): Index
         Returns:
             tuple: (data_past, data_future) where data_past is the past data and
             data_future is the future data.
         """
+        time_step = np.random.randint(self.data_len[index])
         if self.cache:
             data = self.data_dict[index]
+            data_past = data[time_step:time_step+self.past_steps, :, :, :]
+            data_future = data[time_step+self.past_steps:
+                               time_step+self.past_steps+self.future_steps, :, :, :]
         else:
             with h5py.File(self.data_files[index], 'r') as f:
                 data = self.h5py_to_dict(f)
-            
+            data = np.stack([data["data_frame_I"], data["data_frame_Q"]], axis=1)
+            data = data[time_step*self.num_frames_per_clip:
+                        (time_step+self.past_steps+self.future_steps)*self.num_frames_per_clip, :, :]
+            data = self.preprocess_data(data)
+            data_past = data[:self.past_steps*self.num_frames_per_clip, :, :, :]
+            data_future = data[self.past_steps*self.num_frames_per_clip:, :, :, :]
+        return data_past, data_future
+    
+    @staticmethod
+    def collate_fn(batch):
+        """
+        Args:
+            batch: list of tuples (data_past, data_future).
+        Returns:
+            tuple: (data_past, data_future) where data_past is the past data and
+            data_future is the future data.
+        """
+        data_past, data_future = list(zip(*batch))
+        data_past = np.concatenate(data_past, axis=0)
+        data_future = np.concatenate(data_future, axis=0)
+        data_past = torch.from_numpy(data_past).float()
+        data_future = torch.from_numpy(data_future).float()
+        return data_past, data_future

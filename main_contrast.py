@@ -20,7 +20,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 import torch.multiprocessing
 
 import util.misc as utils
-from datasets.dataset import Contrastive_data
+from datasets.dataset import Contrastive_data, Contrastive_data_multi_env
 from models.contrastive_model import *
 from train_eval.train_eval_contrast import *
 from util.Contrastive import ContrastiveLoss
@@ -56,7 +56,8 @@ def get_args_parser():
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
     # dataset parameters
-    parser.add_argument('--data-path', default='path/data_matrix.mat', help='dataset path')
+    parser.add_argument('--train-path', default='path/train/', help='train dataset path')
+    parser.add_argument('--val-path', default='path/val/', help='val dataset path')
     parser.add_argument('--cache-data', default=True, type=bool, help='cache data for faster training')
     parser.add_argument('--train-split', default=0.8, type=float, help='train split')
     parser.add_argument('--output-dir', default='weights', help='path where to save, empty for no saving')
@@ -107,22 +108,20 @@ def main(args):
     
     # dataset generate
     print("Contrastive dataset generating...")
-    dataset_train = Contrastive_data(data_path=args.data_path, 
-                                     cache=args.cache_data,
-                                     past_steps=cfg["contrast_sequence_length"],
-                                     future_steps=args.time_step,
-                                     train_split=args.train_split,
-                                     train=True,
-                                     num_frames_per_clip=cfg["num_frames_per_clip"],
-                                     temp_dim=cfg["Temporal_dim"])
-    dataset_val = Contrastive_data(data_path=args.data_path,
-                                   cache=args.cache_data,
-                                   past_steps=cfg["contrast_sequence_length"],
-                                   future_steps=args.time_step,
-                                   train_split=args.train_split,
-                                   train=False,
-                                   num_frames_per_clip=cfg["num_frames_per_clip"],
-                                   temp_dim=cfg["Temporal_dim"])
+    dataset_train = Contrastive_data_multi_env(data_folder_path=args.train_path, 
+                                               cache=args.cache_data,
+                                               past_steps=cfg["contrast_sequence_length"],
+                                               future_steps=args.time_step,
+                                               train=True,
+                                               num_frames_per_clip=cfg["num_frames_per_clip"],
+                                               temp_dim=cfg["Temporal_dim"])
+    dataset_val = Contrastive_data_multi_env(data_folder_path=args.val_path, 
+                                             cache=args.cache_data,
+                                             past_steps=cfg["contrast_sequence_length"],
+                                             future_steps=args.time_step,
+                                             train=False,
+                                             num_frames_per_clip=cfg["num_frames_per_clip"],
+                                             temp_dim=cfg["Temporal_dim"])
     if args.distributed:
         sampler_train = torch.utils.data.distributed.DistributedSampler(dataset_train)
         sampler_val = torch.utils.data.distributed.DistributedSampler(dataset_val, shuffle=False)
