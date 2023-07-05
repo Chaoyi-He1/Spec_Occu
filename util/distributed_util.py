@@ -30,14 +30,15 @@ class Custom_DistributedSampler(DistributedSampler):
             # Split to nearest available length that is evenly divisible.
             # This is to ensure each rank receives the same amount of data when
             # using this Sampler.
-            self.num_samples = math.ceil(
+            self.num_samples_extend = math.ceil(
                 (len(super().dataset) - super().num_replicas) / super().num_replicas  
                 # type: ignore[arg-type]
             )
         else:
-            self.num_samples = math.ceil(len(super().dataset) / super().num_replicas)  
+            self.num_samples_extend = math.ceil(
+                len(super().dataset) / super().num_replicas)  
             # type: ignore[arg-type]
-        self.total_size = self.num_samples * super().num_replicas
+        self.total_size_extend = self.num_samples_extend * super().num_replicas
     
     def __iter__(self) -> Iterator[T_co]:
         # deterministically shuffle based on epoch and seed
