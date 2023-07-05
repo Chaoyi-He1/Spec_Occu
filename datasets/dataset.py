@@ -226,8 +226,8 @@ class Contrastive_data_multi_env(Dataset):
             # if the data is from h5py file, it means that the data is cached,
             # the dict contains I and Q channel, each channel is a 2D matrix
             # with shape (num_frames, temporal_dim)
-            real = data["data_frame_I"][:25600, :].astype(np.float16)
-            imag = data["data_frame_Q"][:25600, :].astype(np.float16)
+            real = data["data_frame_I"][:51200, :].astype(np.float16)
+            imag = data["data_frame_Q"][:51200, :].astype(np.float16)
             data = np.stack([real, imag], axis=1)
             data_c = real + 1j * imag
             data_fft = np.fft.fft(data_c, axis=-1)
@@ -258,7 +258,7 @@ class Contrastive_data_multi_env(Dataset):
             b, _, _, _ = data.shape
             data = data.reshape(b, -1, self.num_frames_per_clip, 4, self.temp_dim).\
                    transpose(0, 1, 3, 2, 4)
-        return data
+        return data.copy()
     
     def cache_data(self):
         data_dict = {}
@@ -293,6 +293,7 @@ class Contrastive_data_multi_env(Dataset):
             tuple: (data_past, data_future) where data_past is the past data and
             data_future is the future data.
         """
+        index = index % len(self.data_files)
         time_step = np.random.randint(self.data_len[index])
         if self.cache:
             data = self.data_dict[index]
@@ -308,7 +309,7 @@ class Contrastive_data_multi_env(Dataset):
             data = self.preprocess_data(data)
             data_past = data[:self.past_steps*self.num_frames_per_clip, :, :, :]
             data_future = data[self.past_steps*self.num_frames_per_clip:, :, :, :]
-        return data_past, data_future
+        return data_past, data_future, index
     
     @staticmethod
     def collate_fn(batch):
@@ -319,9 +320,11 @@ class Contrastive_data_multi_env(Dataset):
             tuple: (data_past, data_future) where data_past is the past data and
             data_future is the future data.
         """
-        data_past, data_future = list(zip(*batch))
+        data_past, data_future, index = list(zip(*batch))
         data_past = np.stack(data_past, axis=0)
         data_future = np.stack(data_future, axis=0)
+        index = np.array(index)
         data_past = torch.from_numpy(data_past).float()
         data_future = torch.from_numpy(data_future).float()
-        return data_past, data_future
+        index = torch.from_numpy(index).int()
+        return data_past, data_future, index

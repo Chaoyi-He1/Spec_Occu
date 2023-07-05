@@ -40,7 +40,7 @@ class ContrastiveLoss(nn.Module):
         self.lsoftmax_pred = nn.LogSoftmax(dim=-1)
         self.lsoftmax_targets = nn.LogSoftmax(dim=-2)
 
-    def forward(self, pred: Tensor, targets: Tensor, model: nn.Module):
+    def forward(self, pred: Tensor, targets: Tensor, index: Tensor, model: nn.Module):
         """
         Calculate the infoNCE loss.
         :param pred: Tensor [time_step, B, embed_dim]
@@ -79,7 +79,7 @@ class ContrastiveLoss(nn.Module):
         # Calculate the loss
         # pred: [time_step, B, \hat{embed_dim}]; encoded_targets: [time_step, B, embed_dim]
         # mutural_info: [time_step, B, \hat{B}]
-
+        # unique_index = torch.unique(index)
         mutural_info = torch.matmul(encoded_targets, torch.transpose(pred, 1, 2))
         NCELoss = -torch.sum(torch.diagonal(self.lsoftmax_pred(mutural_info), dim1=-2, dim2=-1) * self.weights) \
                   - torch.sum(torch.diagonal(self.lsoftmax_targets(mutural_info), dim1=-2, dim2=-1) * self.weights)
