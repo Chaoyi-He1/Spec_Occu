@@ -15,6 +15,7 @@ import torch
 import torch.distributed as dist
 import numpy as np
 from util.misc import torch_distributed_zero_first
+from util.distributed_util import Custom_DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 import torch.optim.lr_scheduler as lr_scheduler
 import torch.multiprocessing
@@ -37,7 +38,7 @@ def get_args_parser():
     parser.add_argument('--eval', action='store_true', help='only evaluate model on validation set')
 
     # Model parameters
-    parser.add_argument('--resume', type=str, default='', help="initial weights path")
+    parser.add_argument('--resume', type=str, default='', help="initial weights path")  # weights/model_940.pth
     parser.add_argument('--time-step', type=int, default=12, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
     parser.add_argument('--positional-embedding', default='sine', choices=('sine', 'learned'),
@@ -51,8 +52,8 @@ def get_args_parser():
     parser.add_argument('--lrf', default=0.01, type=float)
     parser.add_argument('--weight_decay', default=0.0, type=float)
     parser.add_argument('--epochs', default=30000, type=int)
-    parser.add_argument('--batch_size', default=8, type=int)
-    parser.add_argument('--num_workers', default=4, type=int)
+    parser.add_argument('--batch_size', default=5, type=int)
+    parser.add_argument('--num_workers', default=5, type=int)
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
     # dataset parameters
@@ -123,8 +124,10 @@ def main(args):
                                              num_frames_per_clip=cfg["num_frames_per_clip"],
                                              temp_dim=cfg["Temporal_dim"])
     if args.distributed:
-        sampler_train = torch.utils.data.distributed.DistributedSampler(dataset_train)
-        sampler_val = torch.utils.data.distributed.DistributedSampler(dataset_val, shuffle=False)
+        # sampler_train = torch.utils.data.distributed.DistributedSampler(dataset_train)
+        # sampler_val = torch.utils.data.distributed.DistributedSampler(dataset_val, shuffle=False)
+        sampler_train = Custom_DistributedSampler(dataset_train, shuffle=True)
+        sampler_val = Custom_DistributedSampler(dataset_val, shuffle=False)
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
         sampler_val = torch.utils.data.SequentialSampler(dataset_val)

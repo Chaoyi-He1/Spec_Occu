@@ -19,7 +19,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     metric_logger.add_meter('lr', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
     
-    for i, (past, future, index) in enumerate(metric_logger.log_every(data_loader, 1, header)):
+    for i, (past, future, index) in enumerate(metric_logger.log_every(data_loader, 20, header)):
         past = past.to(device)
         future = future.to(device)
         index = index.to(device)
@@ -80,7 +80,7 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module,
     metric_logger.add_meter('loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Test:'
 
-    for i, (past, future, index) in enumerate(metric_logger.log_every(data_loader, 1, header)):
+    for i, (past, future, index) in enumerate(metric_logger.log_every(data_loader, 20, header)):
         past = past.to(device)
         future = future.to(device)
 
