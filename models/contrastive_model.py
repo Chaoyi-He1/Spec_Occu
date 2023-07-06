@@ -68,6 +68,7 @@ def calculate_conv2d_padding(stride, kernel_size, d_in, d_out, dilation=1):
 
     padding_h = math.ceil(((h_out - 1) * h_s + h_k - h_in + (h_k - 1) * (h_d - 1)) / 2)
     padding_w = math.ceil(((w_out - 1) * w_s + w_k - w_in + (w_k - 1) * (w_d - 1)) / 2)
+    assert padding_h >= 0 and padding_w >= 0, "Padding value(s) cannot be negative."
 
     padding = (padding_h, padding_w)
     return padding
@@ -116,7 +117,7 @@ class Conv1d_AutoEncoder(nn.Module):
 
         self.ResNet = nn.ModuleList()
         res_params = list(zip([4, 4, 6, 6, 4], [7, 7, 9, 9, 11],   # num_blocks, kernel_size
-                              [7, 5, 5, 3, 3], [1, 5, 5, 3, 3]))   # stride, dilation
+                              [3, 3, 3, 3, 3], [1, 5, 5, 3, 3]))   # stride, dilation
         # final channels = 512; final temp_dim = in_dim // (2^5) = in_dim // 32
         for i, (num_blocks, kernel_size, stride, dilation) in enumerate(res_params):
             self.ResNet.extend([ResBlock(self.channel, kernel_size, stride, self.temp_dim, dilation,

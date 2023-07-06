@@ -38,7 +38,7 @@ def get_args_parser():
     parser.add_argument('--eval', action='store_true', help='only evaluate model on validation set')
 
     # Model parameters
-    parser.add_argument('--resume', type=str, default='', help="initial weights path")  # weights/model_940.pth
+    parser.add_argument('--resume', type=str, default='weights/model_105.pth', help="initial weights path")  # weights/model_940.pth
     parser.add_argument('--time-step', type=int, default=12, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
     parser.add_argument('--positional-embedding', default='sine', choices=('sine', 'learned'),
@@ -288,13 +288,14 @@ def main(args):
                 }, best)
         else:
             # save latest model
+            digits = len(str(args.epochs))
             utils.save_on_master({
                 "epoch": epoch,
                 "model": model_without_ddp.state_dict() if args.distributed else model.state_dict(),
                 "optimizer": optimizer.state_dict(),
                 "scaler": scaler.state_dict() if scaler is not None else None,
                 "lr_scheduler": scheduler.state_dict(),
-            }, os.path.join(args.output_dir, 'model_{}.pth'.format(epoch)))
+            }, os.path.join(args.output_dir, 'model_{}.pth'.format(str(epoch).zfill(digits))))
     
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
