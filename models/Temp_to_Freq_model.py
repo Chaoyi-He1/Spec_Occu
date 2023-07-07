@@ -222,9 +222,9 @@ class Decoder(nn.Module):
         return x
 
 
-class Transformer(nn.Module):
+class Transformer_Temp_2_Freq(nn.Module):
     def __init__(self, cfg: dict = None, pos_type: str = "sine") -> None:
-        super(Transformer, self).__init__()
+        super(Transformer_Temp_2_Freq, self).__init__()
         assert cfg is not None, "cfg is None"
         self.encoder_cfg = {
             "num_blocks": cfg["num_encoder_blocks"],
