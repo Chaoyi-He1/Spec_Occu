@@ -39,6 +39,31 @@ def _get_activation_fn(activation):
     raise RuntimeError(F"activation should be relu/gelu, not {activation}.")
 
 
+def calculate_conv1d_padding(stride, kernel_size, d_in, d_out, dilation=1):
+    """
+    Calculate the padding value for a 1D convolutional layer.
+
+    Args:
+        stride (int): Stride value for the convolutional layer.
+        kernel_size (int): Kernel size for the convolutional layer.
+        d_in (int): Input dimension of the feature map.
+        d_out (int): Output dimension of the feature map.
+        dilation (int, optional): Dilation value for the convolutional layer.
+                                  Default is 1.
+
+    Returns:
+        int: Padding value for the convolutional layer.
+
+    """
+    padding = math.ceil((stride * (d_in - 1) - 
+                         d_in + (dilation * 
+                                 (kernel_size - 1)) + 1) / 2)
+    assert padding >= 0, "Padding value must be greater than or equal to 0."
+
+    return padding
+
+
+
 def calculate_conv2d_padding(stride, kernel_size, d_in, d_out, dilation=1):
     """
     Calculate the padding value for a 2D convolutional layer.
@@ -74,6 +99,18 @@ def calculate_conv2d_padding(stride, kernel_size, d_in, d_out, dilation=1):
     return padding
 
 
+class Conv1d_BN_Relu(nn.Sequential):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1):
+        super(Conv1d_BN_Relu, self).__init__(
+            nn.Conv1d(in_channels, out_channels, kernel_size, stride, padding, dilation),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        return super(Conv1d_BN_Relu, self).forward(x)
+
+
 class Conv2d_BN_Relu(nn.Sequential):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1):
         super(Conv2d_BN_Relu, self).__init__(
@@ -86,11 +123,11 @@ class Conv2d_BN_Relu(nn.Sequential):
         return super(Conv2d_BN_Relu, self).forward(x)
 
 
-class ResBlock(nn.Module):
+class ResBlock_2d(nn.Module):
     def __init__(self, in_channel: int, kernel_size: int = 3, stride: int = 1, 
                  in_dim: Tuple[int, int] = (256, 1024), dilation: int = 1, 
                  drop_path_ratio: float = 0.4) -> None:
-        super(ResBlock, self).__init__()
+        super(ResBlock_2d, self).__init__()
         pad = calculate_conv2d_padding(stride, kernel_size, in_dim, in_dim, dilation)
         self.conv1 = Conv2d_BN_Relu(in_channel, in_channel // 2, kernel_size=1)
         self.conv2 = Conv2d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, 
@@ -101,10 +138,61 @@ class ResBlock(nn.Module):
         return x + self.drop_path(self.conv2(self.conv1(x)))
 
 
-class Conv1d_AutoEncoder(nn.Module):
+class ResBlock_1d(nn.Module):
+    def __init__(self, in_channel: int, kernel_size: int = 3, stride: int = 1, 
+                 in_dim: int = 1024, dilation: int = 1, 
+                 drop_path_ratio: float = 0.4) -> None:
+        super(ResBlock_1d, self).__init__()
+        pad = calculate_conv1d_padding(stride, kernel_size, in_dim, in_dim, dilation)
+        self.conv1 = Conv1d_BN_Relu(in_channel, in_channel // 2, kernel_size=1)
+        self.conv2 = Conv1d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, 
+                                    padding=pad, stride=stride, dilation=dilation)
+        self.drop_path = DropPath(drop_path_ratio) if drop_path_ratio > 0 else nn.Identity()
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x + self.drop_path(self.conv2(self.conv1(x)))
+
+
+class ResBlock_2d_with_Attention(nn.Module):
+    def __init__(self, in_channel: int, kernel_size: int = 3, stride: int = 1, 
+                 in_dim: Tuple[int, int] = (256, 1024), dilation: int = 1, 
+                 drop_path_ratio: float = 0.4) -> None:
+        super(ResBlock_2d_with_Attention, self).__init__()
+        pad = calculate_conv2d_padding(stride, kernel_size, in_dim, in_dim, dilation)
+        self.conv1 = Conv2d_BN_Relu(in_channel, in_channel // 2, kernel_size=1)
+        self.conv2 = Conv2d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, 
+                                    padding=pad, stride=stride, dilation=dilation)
+        self.atten = nn.Conv2d(in_channel, in_channel, kernel_size=1, stride=1, padding=0)
+        self.drop_path = DropPath(drop_path_ratio) if drop_path_ratio > 0 else nn.Identity()
+
+    def forward(self, x: Tensor) -> Tensor:
+        conv_out = self.conv2(self.conv1(x))
+        atten_out = F.sigmoid(self.atten(x))
+        return x * atten_out + self.drop_path(conv_out)
+
+
+class ResBlock_1d_with_Attention(nn.Module):
+    def __init__(self, in_channel: int, kernel_size: int = 3, stride: int = 1, 
+                 in_dim: int = 1024, dilation: int = 1, 
+                 drop_path_ratio: float = 0.4) -> None:
+        super(ResBlock_1d_with_Attention, self).__init__()
+        pad = calculate_conv1d_padding(stride, kernel_size, in_dim, in_dim, dilation)
+        self.conv1 = Conv1d_BN_Relu(in_channel, in_channel // 2, kernel_size=1)
+        self.conv2 = Conv1d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, 
+                                    padding=pad, stride=stride, dilation=dilation)
+        self.atten = nn.Conv1d(in_channel, in_channel, kernel_size=1, stride=1, padding=0)
+        self.drop_path = DropPath(drop_path_ratio) if drop_path_ratio > 0 else nn.Identity()
+
+    def forward(self, x: Tensor) -> Tensor:
+        conv_out = self.conv2(self.conv1(x))
+        atten_out = F.sigmoid(self.atten(x))
+        return x * atten_out + self.drop_path(conv_out)
+
+
+class Conv2d_AutoEncoder(nn.Module):
     def __init__(self, in_dim: Tuple[int, int] = (256, 1024), 
-                 in_channel: int = 2, drop_path: float = 0.4) -> None:
-        super(Conv1d_AutoEncoder, self).__init__()
+                 in_channel: int = 2, drop_path: float = 0.4, with_atten: bool = True) -> None:
+        super(Conv2d_AutoEncoder, self).__init__()
         self.in_channel = in_channel
         self.temp_dim = in_dim
         self.channel = 16
@@ -120,8 +208,10 @@ class Conv1d_AutoEncoder(nn.Module):
                               [3, 3, 3, 3, 3], [1, 5, 5, 3, 3]))   # stride, dilation
         # final channels = 512; final temp_dim = in_dim // (2^5) = in_dim // 32
         for i, (num_blocks, kernel_size, stride, dilation) in enumerate(res_params):
-            self.ResNet.extend([ResBlock(self.channel, kernel_size, stride, self.temp_dim, dilation,
-                                         drop_path)
+            self.ResNet.extend([ResBlock_2d(self.channel, kernel_size, stride, self.temp_dim, dilation,
+                                            drop_path) if not with_atten else \
+                                ResBlock_2d_with_Attention(self.channel, kernel_size, stride, self.temp_dim,
+                                                           dilation, drop_path)
                                 for _ in range(num_blocks)])
             if i != len(res_params) - 1:
                 pad = calculate_conv2d_padding(stride, kernel_size, self.temp_dim, 
@@ -153,6 +243,59 @@ class Conv1d_AutoEncoder(nn.Module):
         x = self.avgpool(x)
         return x.squeeze(-1).squeeze(-1)
 
+
+class Conv1d_AutoEncoder(nn.Module):
+    def __init__(self, in_dim: int = 1024, in_channel: int = 2, 
+                 drop_path: float = 0.4, with_atten: bool = True) -> None:
+        super(Conv1d_AutoEncoder, self).__init__()
+        self.in_channel = in_channel
+        self.temp_dim = in_dim
+        self.channel = 16
+        pad = calculate_conv1d_padding(1, 11, self.temp_dim, self.temp_dim)
+        self.conv1 = Conv1d_BN_Relu(self.in_channel, self.channel, kernel_size=11, padding=pad)
+        pad = calculate_conv1d_padding(2, 13, self.temp_dim, self.temp_dim // 2)
+        self.conv2 = Conv1d_BN_Relu(self.channel, self.channel * 2, kernel_size=13, stride=2, padding=pad)
+        self.channel *= 2
+        self.temp_dim //= 2
+
+        self.ResNet = nn.ModuleList()
+        res_params = list(zip([4, 4, 6, 6, 4], [7, 7, 9, 9, 11],   # num_blocks, kernel_size
+                              [3, 3, 3, 3, 3], [1, 5, 5, 3, 3]))   # stride, dilation
+        # final channels = 512; final temp_dim = in_dim // (2^5) = in_dim // 32
+        for i, (num_blocks, kernel_size, stride, dilation) in enumerate(res_params):
+            self.ResNet.extend([ResBlock_1d(self.channel, kernel_size, stride, self.temp_dim, dilation,
+                                            drop_path) if not with_atten else \
+                                ResBlock_1d_with_Attention(self.channel, kernel_size, stride, self.temp_dim,
+                                                           dilation, drop_path)
+                                for _ in range(num_blocks)])
+            if i != len(res_params) - 1:
+                pad = calculate_conv1d_padding(stride, kernel_size, self.temp_dim, self.temp_dim // 2, dilation)
+                self.ResNet.append(Conv1d_BN_Relu(self.channel, self.channel * 2,
+                                                  kernel_size, stride, pad, dilation))
+                self.channel *= 2
+                self.temp_dim //= 2
+        
+        self.avgpool = nn.AdaptiveAvgPool1d(1)
+        self._reset_parameters()
+    
+    def _reset_parameters(self):
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_normal_(p)
+    
+    def forward(self, inputs: Tensor) -> Tensor:
+        # inputs: [L, 4, in_dim], 
+        # L is the sequence_length in the following Transformer based AutoRegressive model
+        # output: [L, Embedding], Embedding = 512
+
+        # assert inputs.shape[1] == 2 and len(inputs.shape) == 3, "Input shape should be [B, 2, Embedding]"
+
+        x = self.conv1(inputs)
+        x = self.conv2(x)
+        for block in self.ResNet:
+            x = block(x)
+        x = self.avgpool(x)
+        return x.squeeze(-1)
 
 class TransEncoder_Conv1d_Act_block(nn.Module):
     def __init__(self, num_layers=4, d_model=512, nhead=8, dim_feedforward=512, dropout=0.1,
@@ -281,15 +424,24 @@ class Autoregressive_Attention(nn.Module):
 
 
 class Encoder_Regressor(nn.Module):
-    def __init__(self, cfg: dict = None, timestep: int = 12, pos_type: str = "sine") -> None:
+    def __init__(self, cfg: dict = None, timestep: int = 12, 
+                 pos_type: str = "sine", in_type: str = "1d") -> None:
         super(Encoder_Regressor, self).__init__()
         assert cfg is not None, "cfg should be a dict"
         self.AutoEncoder_cfg = {
             "in_dim": (cfg["num_frames_per_clip"], cfg["Temporal_dim"]),
             "in_channel": cfg["in_channels"],
             "drop_path": cfg["drop_path"],
+            "with_atten": cfg["Encoder_attention"],
+        } if in_type == "2d" else {
+            "in_dim": cfg["Temporal_dim"],
+            "in_channel": cfg["in_channels"],
+            "drop_path": cfg["drop_path"],
+            "with_atten": cfg["Encoder_attention"],
         }
-        self.encoder = Conv1d_AutoEncoder(**self.AutoEncoder_cfg)
+        self.encoder = Conv2d_AutoEncoder(**self.AutoEncoder_cfg) \
+            if in_type == "2d" else \
+                Conv1d_AutoEncoder(**self.AutoEncoder_cfg)
         self.embed_dim = self.encoder.channel
         self.frames_per_clip = cfg["num_frames_per_clip"]
         self.in_dim = cfg["Temporal_dim"]

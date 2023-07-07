@@ -18,3 +18,4 @@ time_step_weights: [1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]
 contrast_normalize_before: True
 contrast_attention: True    # use pure attention (True) or attention with Conv1d (False) for Auto Regressive
 num_frames_per_clip: 64    # number of frames per block for the encoder
+Encoder_attention: True    # use attention (True) or without attention for Encoder residual blocks
