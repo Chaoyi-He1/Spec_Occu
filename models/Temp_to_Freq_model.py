@@ -9,6 +9,7 @@ from typing import Optional
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
+import math
 
 from .transformer import Transformer_Encoder, Transformer_Decoder, DropPath
 from .positional_embedding import build_position_encoding
@@ -31,6 +32,30 @@ def _get_activation_fn(activation):
     raise RuntimeError(F"activation should be relu/gelu, not {activation}.")
 
 
+def calculate_conv1d_padding(stride, kernel_size, d_in, d_out, dilation=1):
+    """
+    Calculate the padding value for a 1D convolutional layer.
+
+    Args:
+        stride (int): Stride value for the convolutional layer.
+        kernel_size (int): Kernel size for the convolutional layer.
+        d_in (int): Input dimension of the feature map.
+        d_out (int): Output dimension of the feature map.
+        dilation (int, optional): Dilation value for the convolutional layer.
+                                  Default is 1.
+
+    Returns:
+        int: Padding value for the convolutional layer.
+
+    """
+    padding = math.ceil((stride * (d_in - 1) - 
+                         d_in + (dilation * 
+                                 (kernel_size - 1)) + 1) / 2)
+    assert padding >= 0, "Padding value must be greater than or equal to 0."
+
+    return padding
+
+
 class TransEncoder_Conv1d_Act_block(nn.Module):
     def __init__(self, num_layers=4, d_model=512, nhead=8, dim_feedforward=2048, dropout=0.1,
                  drop_path=0.4, activation="relu", normalize_before=True,
@@ -42,8 +67,10 @@ class TransEncoder_Conv1d_Act_block(nn.Module):
                                            nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout,
                                            drop_path=drop_path, activation=activation, 
                                            normalize_before=normalize_before)
+        padding = calculate_conv1d_padding(stride=1, kernel_size=kernel, 
+                                           d_in=sequence_length, d_out=sequence_length)
         self.conv1d = nn.Conv1d(in_channels=sequence_length, out_channels=sequence_length, 
-                                kernel_size=kernel, stride=1, padding=kernel // 2 - 1)
+                                kernel_size=kernel, stride=1, padding=padding)
         self.activation = _get_activation_fn(activation)
     
     def forward(self, src: Tensor,
@@ -120,8 +147,10 @@ class TransDecoder_Conv1d_Act_block(nn.Module):
                                            nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout,
                                            drop_path=drop_path, activation=activation,
                                            normalize_before=normalize_before)
+        padding = calculate_conv1d_padding(stride=1, kernel_size=kernel,
+                                           d_in=sequence_length, d_out=sequence_length)
         self.conv1d = nn.Conv1d(in_channels=sequence_length, out_channels=sequence_length,
-                                kernel_size=kernel, stride=1, padding=kernel // 2 - 1)
+                                kernel_size=kernel, stride=1, padding=padding)
         self.activation = _get_activation_fn(activation)
 
     def forward(self, tgt: Tensor, memory: Tensor,
