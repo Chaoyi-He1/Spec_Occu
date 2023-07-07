@@ -5,6 +5,7 @@ Temporal_dim: 1024
 in_channels: 4
 dropout: 0.2
 drop_path: 0.2
+in_type: "1d" # 1d or 2d
 
 # Contrastive model
 contrast_embed_dim: 512  # This is fixed based on the Encoder's convolution channels
