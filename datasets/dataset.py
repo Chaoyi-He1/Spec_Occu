@@ -177,7 +177,7 @@ class Contrastive_data_multi_env(Dataset):
     Each file contains the rx signal for I and Q channel.
     One sampled timeframe is stored in one row
     """
-    def __init__(self, data_folder_path: str = "", cache: bool = True, 
+    def __init__(self, data_folder_path: str = "", cache: bool = True, in_type: str = "1d",
                  past_steps: int = 32, future_steps: int = 12, train: bool = True, 
                  num_frames_per_clip: int = 256, temp_dim: int = 1024) -> None:
         super(Contrastive_data_multi_env, self).__init__()
@@ -186,6 +186,7 @@ class Contrastive_data_multi_env(Dataset):
         self.data_files = [os.path.join(data_folder_path, f) for f in os.listdir(data_folder_path)]
         self.data_files.sort()
         self.num_env = len(self.data_files)
+        self.in_type = in_type
 
         self.cache = cache
         self.past_steps = past_steps
@@ -215,7 +216,8 @@ class Contrastive_data_multi_env(Dataset):
         Preprocess the data to reshape it as a 3D input for the model.
         The raw data was stored as a 2D matrix, each row represents a sampled timeframe.
         Raw data shape: (num_frames, 2, temprol_dim)
-        Preprocessed data shape: (-1, 4, num_frames_per_clip, temp_dim)
+        Preprocessed data shape: (-1, 4, num_frames_per_clip, temp_dim) if in_type is "2d"
+        Preprocessed data shape: (-1, 4, temp_dim) if in_type is "1d"
 
         Args:
             h5py_data: data from h5py file, a dict contains I and Q channel
@@ -237,8 +239,10 @@ class Contrastive_data_multi_env(Dataset):
                                 data_f_real[:, np.newaxis, :], 
                                 data_f_imag[:, np.newaxis, :]], axis=1)
             # data = data[:-(data.shape[0] % self.num_frames_per_clip), :, :]
-            data = data.reshape(-1, self.num_frames_per_clip, 4, self.temp_dim).\
-                   transpose(0, 2, 1, 3).astype(np.float16)
+            if self.in_type == "2d":
+                data = data.reshape(-1, self.num_frames_per_clip, 4, self.temp_dim).\
+                    transpose(0, 2, 1, 3)
+            data = data.astype(np.float32)
         elif isinstance(data, np.ndarray):
             # if the data is a numpy array, it means that the data is not cached,
             # the data is a 4D matrix with shape (batch, num_frames, 2, temporal_dim)
@@ -253,11 +257,14 @@ class Contrastive_data_multi_env(Dataset):
             data_f_imag = np.imag(data_fft)
             data = np.concatenate([data, 
                                    data_f_real[:, :, np.newaxis, :], 
-                                   data_f_imag[:, :, np.newaxis, :]], axis=1)
-            data = data[:, :-(data.shape[0] % self.num_frames_per_clip), :, :]
-            b, _, _, _ = data.shape
-            data = data.reshape(b, -1, self.num_frames_per_clip, 4, self.temp_dim).\
-                   transpose(0, 1, 3, 2, 4)
+                                   data_f_imag[:, :, np.newaxis, :]], axis=2)
+            # data = data[:, :-(data.shape[0] % self.num_frames_per_clip), :, :]
+            if self.in_type == "2d":
+                b, _, _, _ = data.shape
+                data = data.reshape(b, -1, self.num_frames_per_clip, 4, self.temp_dim).\
+                    transpose(0, 1, 3, 2, 4)
+            data = data.astype(np.float32)
+
         return data.copy()
     
     def cache_data(self):
@@ -275,7 +282,8 @@ class Contrastive_data_multi_env(Dataset):
             else:
                 data_dict[i] = None
                 data_len[i] = data["data_frame_I"].shape[0] // self.num_frames_per_clip \
-                              - self.past_steps - self.future_steps + 1
+                              - self.past_steps - self.future_steps + 1 if self.in_type == "2d" \
+                              else data["data_frame_I"].shape[0] - self.past_steps - self.future_steps + 1
             min_len = min(min_len, data_len[i])
         return data_dict, data_len, min_len
 
@@ -297,18 +305,21 @@ class Contrastive_data_multi_env(Dataset):
         time_step = np.random.randint(self.data_len[index])
         if self.cache:
             data = self.data_dict[index]
-            data_past = data[time_step:time_step+self.past_steps, :, :, :]
+            data_past = data[time_step:time_step+self.past_steps, ...]
             data_future = data[time_step+self.past_steps:
-                               time_step+self.past_steps+self.future_steps, :, :, :]
+                               time_step+self.past_steps+self.future_steps, ...]
         else:
             with h5py.File(self.data_files[index], 'r') as f:
                 data = self.h5py_to_dict(f)
             data = np.stack([data["data_frame_I"], data["data_frame_Q"]], axis=1)
-            data = data[time_step*self.num_frames_per_clip:
-                        (time_step+self.past_steps+self.future_steps)*self.num_frames_per_clip, :, :]
+            if self.in_type == "2d":
+                data = data[time_step*self.num_frames_per_clip:
+                            (time_step+self.past_steps+self.future_steps)*self.num_frames_per_clip, :, :]
+            else:
+                data = data[time_step:time_step+self.past_steps+self.future_steps, :, :]
             data = self.preprocess_data(data)
-            data_past = data[:self.past_steps*self.num_frames_per_clip, :, :, :]
-            data_future = data[self.past_steps*self.num_frames_per_clip:, :, :, :]
+            data_past = data[:self.past_steps*self.num_frames_per_clip, ...]
+            data_future = data[self.past_steps*self.num_frames_per_clip:, ...]
         return data_past, data_future, index
     
     @staticmethod
