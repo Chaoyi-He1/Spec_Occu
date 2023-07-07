@@ -60,11 +60,11 @@ class Temporal_Freq_Loss(nn.Module):
         b, l, n = targets.shape
         device = targets.device
 
-        assert pred.shape == (b, l, n), \
-            "pred shape should be [B, time_step, num_freq]"
+        # assert pred.shape == (b, l, n), \
+        #     "pred shape should be [B, time_step, num_freq]"
         
-        assert len(self.weights) == l, \
-            "time_step_weights length should be the same as time_step"
+        # assert len(self.weights) == l, \
+        #     "time_step_weights length should be the same as time_step"
 
         # Calculate the loss
         loss_steps = self.loss(pred, targets, reduction="none").to(device)

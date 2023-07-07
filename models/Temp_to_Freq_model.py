@@ -68,7 +68,7 @@ class TransEncoder_Conv1d_Act_block(nn.Module):
                                            drop_path=drop_path, activation=activation, 
                                            normalize_before=normalize_before)
         padding = calculate_conv1d_padding(stride=1, kernel_size=kernel, 
-                                           d_in=sequence_length, d_out=sequence_length)
+                                           d_in=d_model, d_out=d_model)
         self.conv1d = nn.Conv1d(in_channels=sequence_length, out_channels=sequence_length, 
                                 kernel_size=kernel, stride=1, padding=padding)
         self.activation = _get_activation_fn(activation)
@@ -148,7 +148,7 @@ class TransDecoder_Conv1d_Act_block(nn.Module):
                                            drop_path=drop_path, activation=activation,
                                            normalize_before=normalize_before)
         padding = calculate_conv1d_padding(stride=1, kernel_size=kernel,
-                                           d_in=sequence_length, d_out=sequence_length)
+                                           d_in=d_model, d_out=d_model)
         self.conv1d = nn.Conv1d(in_channels=sequence_length, out_channels=sequence_length,
                                 kernel_size=kernel, stride=1, padding=padding)
         self.activation = _get_activation_fn(activation)
@@ -227,29 +227,29 @@ class Transformer_Temp_2_Freq(nn.Module):
         super(Transformer_Temp_2_Freq, self).__init__()
         assert cfg is not None, "cfg is None"
         self.encoder_cfg = {
-            "num_blocks": cfg["num_encoder_blocks"],
-            "num_layers": cfg["num_encoder_layers"],
-            "d_model": cfg["encoder_embed_model"],
-            "nhead": cfg["encoder_nhead"],
+            "num_blocks": cfg["num_T2F_encoder_blocks"],
+            "num_layers": cfg["num_T2F_encoder_layers"],
+            "d_model": cfg["T2F_encoder_embed_dim"],
+            "nhead": cfg["T2F_encoder_nhead"],
             "dropout": cfg["dropout"],
             "drop_path": cfg["drop_path"],
-            "sequence_length": cfg["encoder_sequence_length"],
+            "sequence_length": cfg["T2F_encoder_sequence_length"],
         }
 
         self.decoder_cfg = {
-            "num_blocks": cfg["num_decoder_blocks"],
-            "num_layers": cfg["num_decoder_layers"],
-            "d_model": cfg["decoder_embed_model"],
-            "nhead": cfg["decoder_nhead"],
+            "num_blocks": cfg["num_T2F_decoder_blocks"],
+            "num_layers": cfg["num_T2F_decoder_layers"],
+            "d_model": cfg["T2F_decoder_embed_dim"],
+            "nhead": cfg["T2F_decoder_nhead"],
             "dropout": cfg["dropout"],
             "drop_path": cfg["drop_path"],
-            "sequence_length": cfg["num_queries"],
+            "sequence_length": cfg["T2F_num_queries"],
         }
 
         self.encoder = Encoder(**self.encoder_cfg)
         self.decoder = Decoder(**self.decoder_cfg)
 
-        self.query_embed = nn.Embedding(cfg["num_queries"], self.decoder_cfg["d_model"])
+        self.query_embed = nn.Embedding(cfg["T2F_num_queries"], self.decoder_cfg["d_model"])
         
         self.encoder_pos = build_position_encoding(type=pos_type, 
                                                    d_model=self.encoder_cfg["d_model"])
@@ -258,9 +258,9 @@ class Transformer_Temp_2_Freq(nn.Module):
         self.query_pos = build_position_encoding(type=pos_type,
                                                  d_model=self.decoder_cfg["d_model"])
         
-        self.classify_head = nn.Parameter(torch.randn(cfg["num_queries"], 
-                                                      cfg["decoder_embed_model"], 
-                                                      cfg["num_classes"]))
+        self.classify_head = nn.Parameter(torch.randn(cfg["T2F_num_queries"], 
+                                                      cfg["T2F_decoder_embed_dim"], 
+                                                      cfg["T2F_num_classes"]))
         
     def forward(self, src: Tensor,
                 src_mask: Optional[Tensor] = None) -> Tensor:
