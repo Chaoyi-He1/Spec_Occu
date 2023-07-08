@@ -15,16 +15,15 @@ import torch
 import torch.distributed as dist
 import numpy as np
 from util.misc import torch_distributed_zero_first
-from util.distributed_util import Custom_DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
 import torch.optim.lr_scheduler as lr_scheduler
 import torch.multiprocessing
 
 import util.misc as utils
-from datasets.dataset import Contrastive_data, Contrastive_data_multi_env
-from models.contrastive_model import *
-from train_eval.train_eval_contrast import *
-from util.Contrastive import ContrastiveLoss
+from datasets.dataset import Temporal_to_Freq_data
+from models.Temp_to_Freq_model import *
+from train_eval.train_eval_Temp_Freq import *
+from util.Temp_to_Freq import *
 
 
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -107,25 +106,15 @@ def main(args):
     
     # dataset generate
     print("Contrastive dataset generating...")
-    dataset_train = Contrastive_data_multi_env(data_folder_path=args.train_path, 
-                                               cache=args.cache_data,
-                                               past_steps=cfg["contrast_sequence_length"],
-                                               future_steps=args.time_step,
-                                               train=True,
-                                               num_frames_per_clip=cfg["num_frames_per_clip"],
-                                               temp_dim=cfg["Temporal_dim"])
-    dataset_val = Contrastive_data_multi_env(data_folder_path=args.val_path, 
-                                             cache=args.cache_data,
-                                             past_steps=cfg["contrast_sequence_length"],
-                                             future_steps=args.time_step,
-                                             train=False,
-                                             num_frames_per_clip=cfg["num_frames_per_clip"],
-                                             temp_dim=cfg["Temporal_dim"])
+    dataset_train = Temporal_to_Freq_data(data_folder_path=args.train_path, 
+                                          cache=args.cache_data,
+                                          time_step=cfg["T2F_encoder_sequence_length"])
+    dataset_val = Temporal_to_Freq_data(data_folder_path=args.train_path, 
+                                        cache=args.cache_data,
+                                        time_step=cfg["T2F_encoder_sequence_length"])
     if args.distributed:
-        # sampler_train = torch.utils.data.distributed.DistributedSampler(dataset_train)
-        # sampler_val = torch.utils.data.distributed.DistributedSampler(dataset_val, shuffle=False)
-        sampler_train = Custom_DistributedSampler(dataset_train, shuffle=True)
-        sampler_val = Custom_DistributedSampler(dataset_val, shuffle=False)
+        sampler_train = torch.utils.data.distributed.DistributedSampler(dataset_train)
+        sampler_val = torch.utils.data.distributed.DistributedSampler(dataset_val, shuffle=False)
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
         sampler_val = torch.utils.data.SequentialSampler(dataset_val)
@@ -145,14 +134,13 @@ def main(args):
     
     # model
     print("Model generating...")
-    model = build_contrastive_model(cfg=cfg, timestep=args.time_step, pos_type=args.positional_embedding)
+    model = build_T2F(cfg=cfg, pos_type=args.positional_embedding)
     model.to(device)
     if args.rank in [-1, 0]:
         tb_writer.add_graph(model, torch.randn((args.batch_size, 
-                                                cfg["contrast_sequence_length"], 
+                                                cfg["T2F_encoder_sequence_length"], 
                                                 cfg["in_channels"], 
-                                                cfg["num_frames_per_clip"],
-                                                cfg["Temporal_dim"]), 
+                                                cfg["T2F_encoder_embed_dim"]), 
                                               device=device, dtype=torch.float), use_strict_trace=False)
     
     # load previous model if resume training
@@ -187,13 +175,6 @@ def main(args):
         del ckpt
         print("Loading model from: ", args.resume, "finished.")
     
-    # freeze encoder if args.freeze_encoder is true
-    if args.freeze_encoder:
-        for name, param in model.named_parameters():
-            if "encoder" in name:
-                param.requires_grad = False
-        print("Encoder frozen.")
-    
     # synchronize batch norm layers if args.sync_bn is true
     if args.sync_bn:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
@@ -224,7 +205,7 @@ def main(args):
     scheduler.last_epoch = start_epoch  # do not move
     
     # loss function
-    criterion = ContrastiveLoss(time_step_weights=cfg["time_step_weights"])
+    criterion = Temporal_Freq_Loss(time_step_weights=cfg["time_step_weights"])
 
     # start training
     print("Start training...")

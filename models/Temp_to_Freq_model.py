@@ -277,4 +277,7 @@ class Transformer_Temp_2_Freq(nn.Module):
 
         pred_cls = torch.einsum("bnd,ndc->bnc", hs, self.classify_head)
         return F.sigmoid(pred_cls)
-        
+
+
+def build_T2F(cfg: dict = None, pos_type: str = "sine") -> Transformer_Temp_2_Freq:
+    return Transformer_Temp_2_Freq(cfg, pos_type)
