@@ -58,6 +58,7 @@ class VarianceSchedule(Module):
         sigmas = self.sigmas_flex[t] * flexibility + self.sigmas_inflex[t] * (1 - flexibility)
         return sigmas
 
+
 class DiffusionTraj(Module):
 
     def __init__(self, net, var_sched:VarianceSchedule):
