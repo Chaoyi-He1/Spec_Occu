@@ -8,7 +8,24 @@ import pdb
 
 
 class VarianceSchedule(Module):
+    """
+    Variance schedule for diffusion process.
+    Parameters
+    ----------
+    num_steps: int, number of steps in the diffusion process. (Markov chain length)
+    mode: str, 'linear' or 'cosine', the mode of the variance schedule.
+    beta_1: float, the initial value of beta.
+    beta_T: float, the final value of beta.
+    cosine_s: float, the cosine annealing start value.
 
+    Attributes
+    ----------
+    betas: Tensor, [T+1], the beta values.
+    alphas: Tensor, [T+1], the alpha values. alpha = 1 - beta
+    alpha_bars: Tensor, [T+1], the cumulative sum of alpha. alpha_bar_t = sum_{i=0}^{t-1} alpha_i
+    sigmas_flex: Tensor, [T+1], the flexible part of the variance schedule. sigma_t = sqrt(beta_t)
+    sigmas_inflex: Tensor, [T+1], the inflexible part of the variance schedule. sigma_t = sqrt(beta_t)
+    """
     def __init__(self, num_steps, mode='linear',beta_1=1e-4, beta_T=5e-2,cosine_s=8e-3):
         super().__init__()
         assert mode in ('linear', 'cosine')
@@ -60,14 +77,20 @@ class VarianceSchedule(Module):
 
 
 class DiffusionTraj(Module):
-
     def __init__(self, net, var_sched:VarianceSchedule):
         super().__init__()
         self.net = net
         self.var_sched = var_sched
 
     def get_loss(self, x_0, context, t=None):
-
+        """
+        Diffusion loss.
+        Based on Denoising Diffusion Probabilistic Models
+        equation (14) in
+        https://arxiv.org/abs/2006.11239
+        Loss = ||\epsilon - \epsilon_theta(\sqrt(\alpha_bar_t x0) + \sqrt(1 - \alpha_bar_t \epsilon)
+                                          , t)||^2
+        """
         batch_size, _, point_dim = x_0.size()
         if t == None:
             t = self.var_sched.uniform_sample_t(batch_size)
@@ -80,14 +103,14 @@ class DiffusionTraj(Module):
 
         e_rand = torch.randn_like(x_0).cuda()  # (B, N, d)
 
-
         e_theta = self.net(c0 * x_0 + c1 * e_rand, beta=beta, context=context)
-        loss = F.mse_loss(e_theta.view(-1, point_dim), e_rand.view(-1, point_dim), reduction='mean')
+        loss = F.mse_loss(e_theta, e_rand, reduction='mean')
         return loss
 
-    def sample(self, num_points, context, sample, bestof, point_dim=2, flexibility=0.0, ret_traj=False, sampling="ddpm", step=100):
+    def sample(self, num_points, context, sample, bestof, 
+               point_dim=2, flexibility=0.0, ret_traj=False, sampling="ddpm", step=100):
         traj_list = []
-        for i in range(sample):
+        for _ in range(sample):
             batch_size = context.size(0)
             if bestof:
                 x_T = torch.randn([batch_size, num_points, point_dim]).to(context.device)
@@ -95,20 +118,20 @@ class DiffusionTraj(Module):
                 x_T = torch.zeros([batch_size, num_points, point_dim]).to(context.device)
             traj = {self.var_sched.num_steps: x_T}
             stride = step
-            #stride = int(100/stride)
+
             for t in range(self.var_sched.num_steps, 0, -stride):
                 z = torch.randn_like(x_T) if t > 1 else torch.zeros_like(x_T)
                 alpha = self.var_sched.alphas[t]
                 alpha_bar = self.var_sched.alpha_bars[t]
-                alpha_bar_next = self.var_sched.alpha_bars[t-stride]
-                #pdb.set_trace()
+                alpha_bar_next = self.var_sched.alpha_bars[t-stride]    # next: closer to 1
+                # pdb.set_trace()
                 sigma = self.var_sched.get_sigmas(t, flexibility)
 
                 c0 = 1.0 / torch.sqrt(alpha)
                 c1 = (1 - alpha) / torch.sqrt(1 - alpha_bar)
 
                 x_t = traj[t]
-                beta = self.var_sched.betas[[t]*batch_size]
+                beta = self.var_sched.betas[[t] * batch_size]
                 e_theta = self.net(x_t, beta=beta, context=context)
                 if sampling == "ddpm":
                     x_next = c0 * (x_t - c1 * e_theta) + sigma * z
