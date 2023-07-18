@@ -5,6 +5,7 @@ import numpy as np
 import torch.nn as nn
 from .common import *
 import pdb
+from .positional_embedding import *
 
 
 class VarianceSchedule(Module):
@@ -26,7 +27,7 @@ class VarianceSchedule(Module):
     sigmas_flex: Tensor, [T+1], the flexible part of the variance schedule. sigma_t = sqrt(beta_t)
     sigmas_inflex: Tensor, [T+1], the inflexible part of the variance schedule. sigma_t = sqrt(beta_t)
     """
-    def __init__(self, num_steps, mode='linear',beta_1=1e-4, beta_T=5e-2,cosine_s=8e-3):
+    def __init__(self, num_steps, mode='linear', beta_1=1e-4, beta_T=5e-2, cosine_s=8e-3):
         super().__init__()
         assert mode in ('linear', 'cosine')
         self.num_steps = num_steps
@@ -77,9 +78,9 @@ class VarianceSchedule(Module):
 
 
 class DiffusionTraj(Module):
-    def __init__(self, net, var_sched:VarianceSchedule):
+    def __init__(self, model, var_sched:VarianceSchedule):
         super().__init__()
-        self.net = net
+        self.model = model
         self.var_sched = var_sched
 
     def get_loss(self, x_0, context, t=None):
@@ -103,12 +104,19 @@ class DiffusionTraj(Module):
 
         e_rand = torch.randn_like(x_0).cuda()  # (B, N, d)
 
-        e_theta = self.net(c0 * x_0 + c1 * e_rand, beta=beta, context=context)
+        e_theta = self.model(c0 * x_0 + c1 * e_rand, beta=beta, context=context)
         loss = F.mse_loss(e_theta, e_rand, reduction='mean')
         return loss
 
     def sample(self, num_points, context, sample, bestof, 
-               point_dim=2, flexibility=0.0, ret_traj=False, sampling="ddpm", step=100):
+               point_dim=2, flexibility=0.0, ret_traj=False, sampling="ddpm", step=1):
+        """
+        Sample from the diffusion model.
+        DDPM: Denoising Diffusion Probabilistic Models
+        https://arxiv.org/abs/2006.11239
+        DDIM: Denoising Diffusion Implicit Models
+        https://arxiv.org/abs/2010.02502
+        """
         traj_list = []
         for _ in range(sample):
             batch_size = context.size(0)
@@ -132,7 +140,7 @@ class DiffusionTraj(Module):
 
                 x_t = traj[t]
                 beta = self.var_sched.betas[[t] * batch_size]
-                e_theta = self.net(x_t, beta=beta, context=context)
+                e_theta = self.model(x_t, beta=beta, context=context)
                 if sampling == "ddpm":
                     x_next = c0 * (x_t - c1 * e_theta) + sigma * z
                 elif sampling == "ddim":
@@ -153,19 +161,24 @@ class DiffusionTraj(Module):
 
 class TrajNet(Module):
 
-    def __init__(self, point_dim, context_dim, residual):
-        super().__init__()
+    def __init__(self, point_dim: int = 1024, time_embed_dim: int = 256,
+                 context_dim: int = 256, 
+                 residual: bool = True):
+        super(TrajNet, self).__init__()
+
         self.act = F.leaky_relu
         self.residual = residual
+        self.time_embed_dim = time_embed_dim
         self.layers = ModuleList([
-            ConcatSquashLinear(2, 128, context_dim+3),
-            ConcatSquashLinear(128, 256, context_dim+3),
-            ConcatSquashLinear(256, 512, context_dim+3),
-            ConcatSquashLinear(512, 256, context_dim+3),
-            ConcatSquashLinear(256, 128, context_dim+3),
-            ConcatSquashLinear(128, 2, context_dim+3),
-
+            ConcatSquashLinear(point_dim, 2048, context_dim + time_embed_dim),
+            ConcatSquashLinear(2048, 2048, context_dim + time_embed_dim),
+            ConcatSquashLinear(2048, 4096, context_dim + time_embed_dim),
+            ConcatSquashLinear(4096, 2048, context_dim + time_embed_dim),
+            ConcatSquashLinear(2048, 2048, context_dim + time_embed_dim),
+            ConcatSquashLinear(2048, point_dim, context_dim + time_embed_dim),
         ])
+        self.time_embed = None if time_embed_dim == 3 else \
+                          PositionEmbeddingSine(context_dim, normalize=True)
 
     def forward(self, x, beta, context):
         """
@@ -178,7 +191,11 @@ class TrajNet(Module):
         beta = beta.view(batch_size, 1, 1)          # (B, 1, 1)
         context = context.view(batch_size, 1, -1)   # (B, 1, F)
 
-        time_emb = torch.cat([beta, torch.sin(beta), torch.cos(beta)], dim=-1)  # (B, 1, 3)
+        # (B, 1, time_embed_dim)
+        time_emb = torch.cat([beta, torch.sin(beta), torch.cos(beta)], dim=-1) \
+                   if self.time_embed_dim == 3 else \
+                   self.time_embed(context)
+        
         ctx_emb = torch.cat([time_emb, context], dim=-1)    # (B, 1, F+3)
 
         out = x
@@ -195,19 +212,26 @@ class TrajNet(Module):
 
 
 class TransformerConcatLinear(Module):
-
     def __init__(self, point_dim, context_dim, tf_layer, residual):
         super().__init__()
         self.residual = residual
-        self.pos_emb = PositionalEncoding(d_model=2*context_dim, dropout=0.1, max_len=24)
-        self.concat1 = ConcatSquashLinear(2,2*context_dim,context_dim+3)
-        self.layer = nn.TransformerEncoderLayer(d_model=2*context_dim, nhead=4, dim_feedforward=4*context_dim)
-        self.transformer_encoder = nn.TransformerEncoder(self.layer, num_layers=tf_layer)
-        self.concat3 = ConcatSquashLinear(2*context_dim,context_dim,context_dim+3)
-        self.concat4 = ConcatSquashLinear(context_dim,context_dim//2,context_dim+3)
-        self.linear = ConcatSquashLinear(context_dim//2, 2, context_dim+3)
-        #self.linear = nn.Linear(128,2)
+        self.pos_emb = PositionEmbeddingSine(2 * context_dim, normalize=True)
 
+        self.concat1 = ConcatSquashLinear(dim_in=point_dim, dim_out=2 * context_dim, 
+                                          dim_ctx=context_dim+3)
+        
+        self.layer = nn.TransformerEncoderLayer(d_model=2 * context_dim, nhead=4, 
+                                                dim_feedforward=4 * context_dim)
+        self.transformer_encoder = nn.TransformerEncoder(self.layer, num_layers=tf_layer)
+
+        self.concat3 = ConcatSquashLinear(dim_in=2 * context_dim, dim_out=context_dim,
+                                          dim_ctx=context_dim + 3)
+        self.concat4 = ConcatSquashLinear(dim_in=context_dim, dim_out=context_dim // 2,
+                                          dim_ctx=context_dim + 3)
+        
+        self.linear = ConcatSquashLinear(dim_in=context_dim // 2, dim_out=point_dim, 
+                                         dim_ctx=context_dim + 3)
+        #self.linear = nn.Linear(128,2)
 
     def forward(self, x, beta, context):
         batch_size = x.size(0)
@@ -216,24 +240,24 @@ class TransformerConcatLinear(Module):
 
         time_emb = torch.cat([beta, torch.sin(beta), torch.cos(beta)], dim=-1)  # (B, 1, 3)
         ctx_emb = torch.cat([time_emb, context], dim=-1)    # (B, 1, F+3)
-        x = self.concat1(ctx_emb,x)
-        final_emb = x.permute(1,0,2)
-        final_emb = self.pos_emb(final_emb)
 
+        x = self.concat1(ctx_emb, x)
+        final_emb = x.permute(1,0,2).contiguous()
+        final_emb += self.pos_emb(final_emb)
 
-        trans = self.transformer_encoder(final_emb).permute(1,0,2)
+        trans = self.transformer_encoder(final_emb).permute(1,0,2).contiguous()
+
         trans = self.concat3(ctx_emb, trans)
         trans = self.concat4(ctx_emb, trans)
         return self.linear(ctx_emb, trans)
 
 class TransformerLinear(Module):
-
     def __init__(self, point_dim, context_dim, residual):
         super().__init__()
         self.residual = residual
 
         self.pos_emb = PositionalEncoding(d_model=128, dropout=0.1, max_len=24)
-        self.y_up = nn.Linear(2, 128)
+        self.y_up = nn.Linear(point_dim, 128)
         self.ctx_up = nn.Linear(context_dim+3, 128)
         self.layer = nn.TransformerEncoderLayer(d_model=128, nhead=2, dim_feedforward=512)
         self.transformer_encoder = nn.TransformerEncoder(self.layer, num_layers=3)
@@ -276,11 +300,10 @@ class LinearDecoder(Module):
                 #nn.Linear(2, 64),
             ])
     def forward(self, code):
-
         out = code
         for i, layer in enumerate(self.layers):
             out = layer(out)
             if i < len(self.layers) - 1:
                 out = self.act(out)
         return out
-    
+     

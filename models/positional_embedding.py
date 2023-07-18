@@ -6,6 +6,7 @@ import torch
 from torch import nn
 
 
+@torch.no_grad()
 class PositionEmbeddingSine(nn.Module):
     """
     This is a more standard version of the position embedding, very similar to the one
