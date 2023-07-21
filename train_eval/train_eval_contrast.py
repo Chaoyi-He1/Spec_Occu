@@ -15,7 +15,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     metric_logger = MetricLogger(delimiter="; ")
     metric_logger.add_meter('loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     metric_logger.add_meter('class_acc', SmoothedValue(window_size=1, fmt='{value:.2f}'))
-    metric_logger.add_meter('class_acc', SmoothedValue(window_size=1, fmt='{value:.2f}'))
     metric_logger.add_meter('lr', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
     

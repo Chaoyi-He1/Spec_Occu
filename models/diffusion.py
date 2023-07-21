@@ -6,6 +6,7 @@ import torch.nn as nn
 from .common import *
 import pdb
 from .positional_embedding import *
+from .transformer import *
 
 
 class VarianceSchedule(Module):
@@ -212,7 +213,7 @@ class TrajNet(Module):
 
 
 class TransformerConcatLinear(Module):
-    def __init__(self, point_dim, context_dim, tf_layer, residual):
+    def __init__(self, point_dim, context_dim, tf_layer=4, residual=True):
         super().__init__()
         self.residual = residual
         self.pos_emb = PositionEmbeddingSine(2 * context_dim, normalize=True)
@@ -220,9 +221,15 @@ class TransformerConcatLinear(Module):
         self.concat1 = ConcatSquashLinear(dim_in=point_dim, dim_out=2 * context_dim, 
                                           dim_ctx=context_dim+3)
         
-        self.layer = nn.TransformerEncoderLayer(d_model=2 * context_dim, nhead=4, 
-                                                dim_feedforward=4 * context_dim)
-        self.transformer_encoder = nn.TransformerEncoder(self.layer, num_layers=tf_layer)
+        self.encoder_param = {
+            "num_layers": tf_layer,
+            "d_model": 2 * context_dim,
+            "nhead": 8,
+            "dim_feedforward": 2048,
+            "dropout": 0.1,
+            "normalize_before": True,
+        }
+        self.transformer_encoder = Transformer_Encoder(**self.encoder_param)
 
         self.concat3 = ConcatSquashLinear(dim_in=2 * context_dim, dim_out=context_dim,
                                           dim_ctx=context_dim + 3)
@@ -242,27 +249,37 @@ class TransformerConcatLinear(Module):
         ctx_emb = torch.cat([time_emb, context], dim=-1)    # (B, 1, F+3)
 
         x = self.concat1(ctx_emb, x)
-        final_emb = x.permute(1,0,2).contiguous()
-        final_emb += self.pos_emb(final_emb)
+        # final_emb = x.permute(1,0,2).contiguous()
+        x += self.pos_emb(x)
 
-        trans = self.transformer_encoder(final_emb).permute(1,0,2).contiguous()
+        trans = self.transformer_encoder(x)
 
         trans = self.concat3(ctx_emb, trans)
         trans = self.concat4(ctx_emb, trans)
         return self.linear(ctx_emb, trans)
 
+
 class TransformerLinear(Module):
-    def __init__(self, point_dim, context_dim, residual):
+    def __init__(self, point_dim, context_dim, tf_layer=4, residual=True) -> None:
         super().__init__()
         self.residual = residual
+        self.pos_emb = PositionEmbeddingSine(context_dim, normalize=True)
 
-        self.pos_emb = PositionalEncoding(d_model=128, dropout=0.1, max_len=24)
-        self.y_up = nn.Linear(point_dim, 128)
-        self.ctx_up = nn.Linear(context_dim+3, 128)
-        self.layer = nn.TransformerEncoderLayer(d_model=128, nhead=2, dim_feedforward=512)
-        self.transformer_encoder = nn.TransformerEncoder(self.layer, num_layers=3)
-        self.linear = nn.Linear(128, point_dim)
+        self.y_up = nn.Linear(point_dim, 2048)
+        self.ctx_up = nn.Linear(context_dim + 3, 2048)
 
+        self.encoder_param = {
+            "num_layers": tf_layer,
+            "d_model": 2 * context_dim,
+            "nhead": 8,
+            "dim_feedforward": 2048,
+            "dropout": 0.1,
+            "normalize_before": True,
+        }
+        self.transformer_encoder = Transformer_Encoder(**self.encoder_param)
+
+        self.linear = nn.Linear(2048, point_dim)
+    
     def forward(self, x, beta, context):
 
         batch_size = x.size(0)
@@ -274,12 +291,12 @@ class TransformerLinear(Module):
 
         ctx_emb = self.ctx_up(ctx_emb)
         emb = self.y_up(x)
-        final_emb = torch.cat([ctx_emb, emb], dim=1).permute(1,0,2)
-        #pdb.set_trace()
-        final_emb = self.pos_emb(final_emb)
+        final_emb = torch.cat([ctx_emb, emb], dim=1)
+        # pdb.set_trace()
+        final_emb += self.pos_emb(final_emb)
 
-        trans = self.transformer_encoder(final_emb)  # 13 * b * 128
-        trans = trans[1:].permute(1,0,2)   # B * 12 * 128, drop the first one which is the z
+        trans = self.transformer_encoder(final_emb)  # b * L+1 * 128
+        trans = trans[1:]   # B * L * 128, drop the first one which is the conditional feature
         return self.linear(trans)
 
 
@@ -306,4 +323,20 @@ class LinearDecoder(Module):
             if i < len(self.layers) - 1:
                 out = self.act(out)
         return out
-     
+
+
+def build_diffusion_model(diffnet: str = "TransformerConcatLinear",
+                          Temporal_dim: int = 1024, feature_dim: int = 128, 
+                          num_trans_layers: int = 4, residual_trans: bool = True):
+    transformer_param = {
+        "point_dim": Temporal_dim,
+        "context_dim": feature_dim,
+        "tf_layer": num_trans_layers,
+        "residual": residual_trans,
+    }
+    if diffnet == "TransformerConcatLinear":
+        return TransformerConcatLinear(**transformer_param)
+    elif diffnet == "TransformerLinear":
+        return TransformerLinear(**transformer_param)
+    elif diffnet == "LinearDecoder":
+        return LinearDecoder()
