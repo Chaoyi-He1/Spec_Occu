@@ -77,4 +77,5 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
         # Compute the output
         with torch.cuda.amp.autocast(enabled=scaler is not None), torch.no_grad():
             features = encoder(history)
-            predict = criterion.sample()
+            predict = criterion.sample(num_points=l, context=features, sample=repeat, bestof=False, step=1,
+                                       model=model, point_dim=d, flexibility=0.0, ret_traj=False, sampling="ddpm")
