@@ -88,3 +88,19 @@ class Diffusion_utils(nn.Module):
             else:
                 traj_list.append(traj[0])
         return torch.stack(traj_list)
+
+
+def compute_batch_statistics(predictions, gt_future):
+    """
+    Args:
+        predictions: (B, N, d), the generated future signal from the model
+        gt_future: (B, N, d), the ground truth future signal
+    ADE error: average displacement error
+    FDE error: final displacement error
+    """
+    errors = torch.sqrt(((predictions - gt_future)**2).sum(dim=2))  # (B, N)
+    ADE = errors.mean(dim=1)  # (B, )
+    FDE = errors[:, -1]  # (B, )
+    ADE_percents = ADE / torch.sqrt((gt_future**2).sum(dim=2)).mean(dim=1)
+    FDE_percents = FDE / torch.sqrt((gt_future**2).sum(dim=2))[:, -1]
+    return ADE, FDE, ADE_percents, FDE_percents
