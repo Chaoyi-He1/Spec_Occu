@@ -118,57 +118,7 @@ class Contrastive_data(Dataset):
         data_future = torch.cat([data_future_f, data_future_f], dim=2)
 
         return data_past, data_future
-
-class Temporal_to_Freq_data(Dataset):
-    def __init__(self, data_path: str = "", cache_data: bool = True, 
-                 time_step: int = 12) -> None:
-        super(Temporal_to_Freq_data, self).__init__()
-        assert os.path.isfile(data_path), "path '{}' does not exist.".format(data_path)
-        self.data_path = data_path
-        self.data, self.label = self.cache_data() if cache_data else (None, None)
-        self.time_step = time_step
     
-    def cache_data(self):
-        data = sio.loadmat(self.data_path)
-        label = data["label"]
-        data = np.stack([data["real"][:, np.newaxis, :], data["imag"][:, np.newaxis, :]], axis=1)
-        assert data.shape[0] == label.shape[0], "data and label must have the same length."
-        
-        return data, label
-
-    def __len__(self):
-        if self.data is None:
-            data = sio.loadmat(self.data_path)
-            return data["real"].shape[0] - self.time_step + 1
-        else:
-            return self.data.shape[0] - self.time_step + 1
-    
-    def __getitem__(self, index):
-        """
-        Args:
-            index (int): Index
-        Returns:
-            tuple: (data, label) where data is the info within the time steps of the data and
-            label is the frequency occupancy of the data within the time steps.
-        """
-        if self.data is None:
-            with h5py.File(self.data_path, "r") as f:
-                real = f["real"][index:index+self.time_step, :]
-                imag = f["imag"][index:index+self.time_step, :]
-                data = np.stack([real[:, np.newaxis, :], imag[:, np.newaxis, :]], axis=1)
-                label = f["label"][index:index+self.time_step, :]
-        else:
-            data = self.data[index:index+self.time_step, :, :]
-            label = self.label[index:index+self.time_step, :]
-        
-        assert data.shape[0] == label.shape[0], "data and label must have the same length."
-        return data, label
-    
-    @staticmethod
-    def collate_fn(batch):
-        data, label = list(zip(*batch))
-        return torch.tensor(data), torch.tensor(label).long()
-
 
 class Contrastive_data_multi_env(Dataset):
     """
@@ -339,3 +289,55 @@ class Contrastive_data_multi_env(Dataset):
         data_future = torch.from_numpy(data_future).float()
         index = torch.from_numpy(index).int()
         return data_past, data_future, index
+
+
+class Temporal_to_Freq_data(Dataset):
+    def __init__(self, data_path: str = "", cache_data: bool = True, 
+                 time_step: int = 12) -> None:
+        super(Temporal_to_Freq_data, self).__init__()
+        assert os.path.isfile(data_path), "path '{}' does not exist.".format(data_path)
+        self.data_path = data_path
+        self.data, self.label = self.cache_data() if cache_data else (None, None)
+        self.time_step = time_step
+    
+    def cache_data(self):
+        data = sio.loadmat(self.data_path)
+        label = data["label"]
+        data = np.stack([data["real"][:, np.newaxis, :], data["imag"][:, np.newaxis, :]], axis=1)
+        assert data.shape[0] == label.shape[0], "data and label must have the same length."
+        
+        return data, label
+
+    def __len__(self):
+        if self.data is None:
+            data = sio.loadmat(self.data_path)
+            return data["real"].shape[0] - self.time_step + 1
+        else:
+            return self.data.shape[0] - self.time_step + 1
+    
+    def __getitem__(self, index):
+        """
+        Args:
+            index (int): Index
+        Returns:
+            tuple: (data, label) where data is the info within the time steps of the data and
+            label is the frequency occupancy of the data within the time steps.
+        """
+        if self.data is None:
+            with h5py.File(self.data_path, "r") as f:
+                real = f["real"][index:index+self.time_step, :]
+                imag = f["imag"][index:index+self.time_step, :]
+                data = np.stack([real[:, np.newaxis, :], imag[:, np.newaxis, :]], axis=1)
+                label = f["label"][index:index+self.time_step, :]
+        else:
+            data = self.data[index:index+self.time_step, :, :]
+            label = self.label[index:index+self.time_step, :]
+        
+        assert data.shape[0] == label.shape[0], "data and label must have the same length."
+        return data, label
+    
+    @staticmethod
+    def collate_fn(batch):
+        data, label = list(zip(*batch))
+        return torch.tensor(data), torch.tensor(label).long()
+
