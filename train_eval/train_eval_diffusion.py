@@ -9,6 +9,7 @@ def train_one_epoch(encoder: torch.nn.Module, model: torch.nn.Module,
                     criterion: Diffusion_utils, data_loader: Iterable, 
                     optimizer: torch.optim.Optimizer, device: torch.device, 
                     epoch: int, max_norm: float = .01, scaler=None):
+    
     encoder.train()
     model.train()
     criterion.train()
@@ -62,6 +63,7 @@ def train_one_epoch(encoder: torch.nn.Module, model: torch.nn.Module,
 def evaluate(encoder: torch.nn.Module, model: torch.nn.Module, 
              criterion: Diffusion_utils, data_loader: Iterable, 
              device: torch.device, scaler=None, repeat=20):
+    
     encoder.eval()
     model.eval()
     criterion.eval()
