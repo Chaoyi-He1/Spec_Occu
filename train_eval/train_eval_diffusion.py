@@ -66,7 +66,10 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
     model.eval()
     criterion.eval()
     metric_logger = MetricLogger(delimiter="; ")
-    metric_logger.add_meter('loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter('ADE loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter('FDE loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter('ADE percentage', SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter('FDE percentage', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Test:'
 
     for _, (history, future) in enumerate(metric_logger.log_every(data_loader, 10, header)):
@@ -80,3 +83,21 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
             predict = criterion.sample(num_points=l, context=features, sample=repeat, bestof=False, step=1,
                                        model=model, point_dim=d, flexibility=0.0, ret_traj=False, sampling="ddpm")
         
+        ADE, FDE, ADE_percents, FDE_percents = compute_batch_statistics(predict, future)
+        # reduce losses over all GPUs for logging purposes
+        ADE_reduced = reduce_loss(ADE)
+        FDE_reduced = reduce_loss(FDE)
+        ADE_percents_reduced = reduce_loss(ADE_percents)
+        FDE_percents_reduced = reduce_loss(FDE_percents)
+
+        # Update metric
+        metric_logger.update(loss=ADE_reduced.item())
+        metric_logger.update(loss=FDE_reduced.item())
+        metric_logger.update(loss=ADE_percents_reduced.item())
+        metric_logger.update(loss=FDE_percents_reduced.item())
+    
+    # gather the stats from all processes
+    metric_logger.synchronize_between_processes()
+    print("Averaged stats:", metric_logger)
+
+    return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
