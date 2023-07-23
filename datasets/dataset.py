@@ -341,3 +341,51 @@ class Temporal_to_Freq_data(Dataset):
         data, label = list(zip(*batch))
         return torch.tensor(data), torch.tensor(label).long()
 
+
+class Temporal_to_Freq_data_multi_env(Dataset):
+    def __init__(self, data_folder_path: str = "", cache_data: bool = True, 
+                 time_step: int = 12) -> None:
+        super(Temporal_to_Freq_data_multi_env, self).__init__()
+        assert os.path.isdir(data_folder_path), "path '{}' does not exist.".format(data_folder_path)
+        self.data_files = [os.path.join(data_folder_path, f) for f in os.listdir(data_folder_path)]
+        self.data_files.sort()
+        self.num_env = len(self.data_files)
+        self.cache = cache_data
+        self.time_step = time_step
+        self.data_dict, self.label_dict = self.cache_data() if cache_data else (None, None)
+    
+    def cache_data(self):
+        data_dict = {}
+        label_dict = {}
+        for i, data_file_path in enumerate(self.data_files):
+            print("Loading data from %s ..." % data_file_path)
+            data = sio.loadmat(data_file_path)
+            label = data["label"]
+            data = np.stack([data["real"][:, np.newaxis, :], data["imag"][:, np.newaxis, :]], axis=1)
+            assert data.shape[0] == label.shape[0], "data and label must have the same length."
+            data_dict[i] = data
+            label_dict[i] = label
+        return data_dict, label_dict
+
+    def __len__(self):
+        if self.data_dict is None:
+            data = sio.loadmat(self.data_files[0])
+            return data["real"].shape[0] - self.time_step + 1
+        else:
+            return self.data_dict[0].shape[0] - self.time_step + 1
+    
+    def __getitem__(self, index):
+        """
+        Args:
+            index (int): Index
+        Returns:
+            tuple: (data, label) where data is the info within the time steps of the data and
+            label is the frequency occupancy of the data within the time steps.
+        """
+        index = index % len(self.data_files)
+        if self.data_dict is None:
+            data = sio.loadmat(self.data_files[index])
+            real = data["real"][index:index+self.time_step, :]
+            imag = data["imag"][index:index+self.time_step, :]
+            data = np.stack([real[:, np.newaxis, :], imag[:, np.newaxis, :]], axis=1)
+            label = data["label"][index:index+self.time_step, :]
