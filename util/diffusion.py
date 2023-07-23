@@ -93,12 +93,14 @@ class Diffusion_utils(nn.Module):
 def compute_batch_statistics(predictions, gt_future):
     """
     Args:
-        predictions: (B, N, d), the generated future signal from the model
+        predictions: (R, B, N, d), the generated future signal from the model
         gt_future: (B, N, d), the ground truth future signal
     ADE error: average displacement error
     FDE error: final displacement error
     """
-    errors = torch.sqrt(((predictions - gt_future)**2).sum(dim=2))  # (B, N)
+    r, _, _, _ = predictions.shape
+    errors = torch.sqrt(((predictions.sum(dim=0) / r - 
+                          gt_future)**2).sum(dim=2))  # (B, N)
     ADE = errors.mean(dim=1)  # (B, )
     FDE = errors[:, -1]  # (B, )
     ADE_percents = ADE / torch.sqrt((gt_future**2).sum(dim=2)).mean(dim=1)
