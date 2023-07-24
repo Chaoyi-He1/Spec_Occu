@@ -20,7 +20,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 import torch.multiprocessing
 
 import util.misc as utils
-from datasets.dataset import Temporal_to_Freq_data
+from datasets.dataset import *
 from models.Temp_to_Freq_model import *
 from train_eval.train_eval_Temp_Freq import *
 from util.Temp_to_Freq import *
@@ -54,8 +54,8 @@ def get_args_parser():
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
     # dataset parameters
-    parser.add_argument('--train-path', default='path/train/', help='train dataset path')
-    parser.add_argument('--val-path', default='path/val/', help='val dataset path')
+    parser.add_argument('--train-path', default='path/Data_files_with_label/train/', help='train dataset path')
+    parser.add_argument('--val-path', default='path/Data_files_with_label/val/', help='val dataset path')
     parser.add_argument('--cache-data', default=True, type=bool, help='cache data for faster training')
     parser.add_argument('--train-split', default=0.8, type=float, help='train split')
     parser.add_argument('--output-dir', default='weights', help='path where to save, empty for no saving')
@@ -106,12 +106,12 @@ def main(args):
     
     # dataset generate
     print("Contrastive dataset generating...")
-    dataset_train = Temporal_to_Freq_data(data_folder_path=args.train_path, 
-                                          cache=args.cache_data,
-                                          time_step=cfg["T2F_encoder_sequence_length"])
-    dataset_val = Temporal_to_Freq_data(data_folder_path=args.train_path, 
-                                        cache=args.cache_data,
-                                        time_step=cfg["T2F_encoder_sequence_length"])
+    dataset_train = Temporal_to_Freq_data_multi_env(data_folder_path=args.train_path, 
+                                                    cache=args.cache_data,
+                                                    time_step=cfg["T2F_encoder_sequence_length"])
+    dataset_val = Temporal_to_Freq_data_multi_env(data_folder_path=args.val_path, 
+                                                  cache=args.cache_data,
+                                                  time_step=cfg["T2F_encoder_sequence_length"])
     if args.distributed:
         sampler_train = torch.utils.data.distributed.DistributedSampler(dataset_train)
         sampler_val = torch.utils.data.distributed.DistributedSampler(dataset_val, shuffle=False)

@@ -56,6 +56,41 @@ def calculate_conv1d_padding(stride, kernel_size, d_in, d_out, dilation=1):
     return padding
 
 
+def calculate_conv2d_padding(stride, kernel_size, d_in, d_out, dilation=1):
+    """
+    Calculate the padding value for a 2D convolutional layer.
+    
+    Arguments:
+    - stride (int or tuple): The stride value(s) for the convolution.
+    - kernel_size (int or tuple): The size of the convolutional kernel.
+    - d_in (tuple): The input dimensions (height, width) of the feature map.
+    - d_out (tuple): The output dimensions (height, width) of the feature map.
+    - dilation (int or tuple): The dilation value(s) for the convolution. Default is 1.
+    
+    Returns:
+    - padding (tuple): The padding value(s) (padding_h, padding_w) for the convolution.
+    """
+    if isinstance(stride, int):
+        stride = (stride, stride)
+    if isinstance(kernel_size, int):
+        kernel_size = (kernel_size, kernel_size)
+    if isinstance(dilation, int):
+        dilation = (dilation, dilation)
+
+    h_in, w_in = d_in
+    h_out, w_out = d_out
+    h_k, w_k = kernel_size
+    h_s, w_s = stride
+    h_d, w_d = dilation
+
+    padding_h = math.ceil(((h_out - 1) * h_s + h_k - h_in + (h_k - 1) * (h_d - 1)) / 2)
+    padding_w = math.ceil(((w_out - 1) * w_s + w_k - w_in + (w_k - 1) * (w_d - 1)) / 2)
+    assert padding_h >= 0 and padding_w >= 0, "Padding value(s) cannot be negative."
+
+    padding = (padding_h, padding_w)
+    return padding
+
+
 class TransEncoder_Conv1d_Act_block(nn.Module):
     def __init__(self, num_layers=4, d_model=512, nhead=8, dim_feedforward=2048, dropout=0.1,
                  drop_path=0.4, activation="relu", normalize_before=True,
@@ -246,6 +281,10 @@ class Transformer_Temp_2_Freq(nn.Module):
             "sequence_length": cfg["T2F_num_queries"],
         }
 
+        self.reduce_dim_conv = nn.Conv2d(in_channels=cfg["T2F_encoder_sequence_length"],
+                                         out_channels=cfg["T2F_encoder_sequence_length"],
+                                         kernel_size=(2, 1), stride=(1, 1), padding=(0, 0))
+
         self.encoder = Encoder(**self.encoder_cfg)
         self.decoder = Decoder(**self.decoder_cfg)
 
@@ -264,6 +303,7 @@ class Transformer_Temp_2_Freq(nn.Module):
         
     def forward(self, src: Tensor,
                 src_mask: Optional[Tensor] = None) -> Tensor:
+        src = self.reduce_dim_conv(src).squeeze(-2)
         src_pos_embed = self.encoder_pos(src)
         memory = self.encoder(src, src_mask, src_pos_embed)
 

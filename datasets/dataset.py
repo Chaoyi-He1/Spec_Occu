@@ -343,36 +343,62 @@ class Temporal_to_Freq_data(Dataset):
 
 
 class Temporal_to_Freq_data_multi_env(Dataset):
-    def __init__(self, data_folder_path: str = "", cache_data: bool = True, 
+    def __init__(self, data_folder_path: str = "", cache: bool = True, 
                  time_step: int = 12) -> None:
         super(Temporal_to_Freq_data_multi_env, self).__init__()
         assert os.path.isdir(data_folder_path), "path '{}' does not exist.".format(data_folder_path)
         self.data_files = [os.path.join(data_folder_path, f) for f in os.listdir(data_folder_path)]
         self.data_files.sort()
         self.num_env = len(self.data_files)
-        self.cache = cache_data
+        self.cache = cache
         self.time_step = time_step
-        self.data_dict, self.label_dict = self.cache_data() if cache_data else (None, None)
+        (self.data_dict, self.label_dict,
+         self.data_len, self.min_len) = self.cache_data()
+    
+    def h5py_to_dict(self, h5_obj):
+        if isinstance(h5_obj, h5py.File) or isinstance(h5_obj, h5py.Group):
+            data = {}
+            for key in h5_obj.keys():
+                data[key] = self.h5py_to_dict(h5_obj[key])
+            return data
+        elif isinstance(h5_obj, h5py.Dataset):
+            if len(h5_obj.shape) == 2:  # Check if the dataset represents a matrix
+                return np.transpose(h5_obj[()])  # Transpose the matrix
+            else:
+                return h5_obj[()]
+        else:
+            return h5_obj
     
     def cache_data(self):
         data_dict = {}
         label_dict = {}
+        data_len = {}
+        min_len = np.inf
         for i, data_file_path in enumerate(self.data_files):
-            print("Loading data from %s ..." % data_file_path)
-            data = sio.loadmat(data_file_path)
-            label = data["label"]
-            data = np.stack([data["real"][:, np.newaxis, :], data["imag"][:, np.newaxis, :]], axis=1)
-            assert data.shape[0] == label.shape[0], "data and label must have the same length."
-            data_dict[i] = data
-            label_dict[i] = label
-        return data_dict, label_dict
+            print("Loading data from %s ... (%d / %d)" % 
+                  (data_file_path, i, len(self.data_files)))
+            # if "train_20" not in data_file_path:
+            #     continue
+            # continue
+            with h5py.File(data_file_path, 'r') as f:
+                data = self.h5py_to_dict(f)
+            
+            if self.cache:
+                label = data["label_frame"]
+                data_len[i] = data["label_frame"].shape[0] - self.time_step + 1
+                data = np.stack([data["data_frame_I"][:, :], data["data_frame_Q"][:, :]], axis=1)
+                assert data.shape[0] == label.shape[0], "data and label must have the same length."
+                data_dict[i] = data.astype(np.float16)
+                label_dict[i] = label.astype(int)
+            else:
+                data_dict[i] = None
+                data_len[i] = data["data_frame_I"].shape[0] - self.time_step + 1
+                label_dict[i] = data["label_frame"]
+            min_len = min(min_len, data_len[i])
+        return data_dict, label_dict, data_len, min_len
 
     def __len__(self):
-        if self.data_dict is None:
-            data = sio.loadmat(self.data_files[0])
-            return data["real"].shape[0] - self.time_step + 1
-        else:
-            return self.data_dict[0].shape[0] - self.time_step + 1
+        return len(self.data_files)
     
     def __getitem__(self, index):
         """
@@ -382,10 +408,22 @@ class Temporal_to_Freq_data_multi_env(Dataset):
             tuple: (data, label) where data is the info within the time steps of the data and
             label is the frequency occupancy of the data within the time steps.
         """
-        index = index % len(self.data_files)
+        time_step = np.random.randint(self.data_len[index])
         if self.data_dict is None:
-            data = sio.loadmat(self.data_files[index])
-            real = data["real"][index:index+self.time_step, :]
-            imag = data["imag"][index:index+self.time_step, :]
-            data = np.stack([real[:, np.newaxis, :], imag[:, np.newaxis, :]], axis=1)
-            label = data["label"][index:index+self.time_step, :]
+            with h5py.File(self.data_files[index], 'r') as f:
+                data = self.h5py_to_dict(f)
+            real = data["data_frame_I"][time_step:time_step + self.time_step, :]
+            imag = data["data_frame_Q"][time_step:time_step + self.time_step, :]
+            data = np.stack([real, imag], axis=1)
+            label = data["label_frame"][time_step:time_step + self.time_step, :]
+        else:
+            data = self.data_dict[index][time_step:time_step + self.time_step, ...]
+            label = self.label_dict[index][time_step:time_step + self.time_step, ...]
+        return data, label, index
+    
+    @staticmethod
+    def collate_fn(batch):
+        data, label, index = list(zip(*batch))
+        return torch.tensor(data).float(), torch.tensor(label).long(), \
+               torch.tensor(index).int()
+    
