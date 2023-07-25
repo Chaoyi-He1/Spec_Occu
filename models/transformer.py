@@ -110,10 +110,12 @@ class Transformer_Encoder_Layer(nn.Module):
 
 class Transformer_Decoder_Layer(nn.Module):
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
-                 drop_path=0.4, activation="relu", normalize_before=True):
+                 drop_path=0.4, activation="relu", normalize_before=True,
+                 kdim=None, vdim=None):
         super(Transformer_Decoder_Layer, self).__init__()
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout, batch_first=True)
-        self.multihead_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout, batch_first=True)
+        self.multihead_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout, batch_first=True,
+                                                    kdim=kdim, vdim=vdim)
 
         self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(dropout)
@@ -231,7 +233,8 @@ class Transformer_Encoder(nn.Module):
 
 class Transformer_Decoder(nn.Module):
     def __init__(self, num_layers, norm=None, d_model=512, nhead=8, dim_feedforward=2048,
-                 dropout=0.1, drop_path=0.4, activation="relu", normalize_before=True):
+                 dropout=0.1, drop_path=0.4, activation="relu", normalize_before=True,
+                 kdim=None, vdim=None):
         super(Transformer_Decoder, self).__init__()
         self.num_layers = num_layers
         self.norm = norm
@@ -242,7 +245,9 @@ class Transformer_Decoder(nn.Module):
             "dropout": dropout,
             "drop_path": drop_path,
             "activation": activation,
-            "normalize_before": normalize_before
+            "normalize_before": normalize_before,
+            "kdim": kdim,
+            "vdim": vdim,
         }
 
         self.layers = nn.ModuleList([Transformer_Decoder_Layer(**self.layer_args) for _ in range(self.num_layers)])
@@ -267,4 +272,4 @@ class Transformer_Decoder(nn.Module):
         if self.norm is not None:
             output = self.norm(output)
 
-        return output.unsqueeze(0)
+        return output

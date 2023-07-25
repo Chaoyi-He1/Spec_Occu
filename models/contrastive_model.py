@@ -55,7 +55,7 @@ def calculate_conv1d_padding(stride, kernel_size, d_in, d_out, dilation=1):
         int: Padding value for the convolutional layer.
 
     """
-    padding = math.ceil((stride * (d_in - 1) - 
+    padding = math.ceil((stride * (d_out - 1) - 
                          d_in + (dilation * 
                                  (kernel_size - 1)) + 1) / 2)
     assert padding >= 0, "Padding value must be greater than or equal to 0."

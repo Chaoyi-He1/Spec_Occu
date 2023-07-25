@@ -48,9 +48,8 @@ def calculate_conv1d_padding(stride, kernel_size, d_in, d_out, dilation=1):
         int: Padding value for the convolutional layer.
 
     """
-    padding = math.ceil((stride * (d_in - 1) - 
-                         d_in + (dilation * 
-                                 (kernel_size - 1)) + 1) / 2)
+    padding = math.ceil(((d_out - 1) * stride + kernel_size - 
+                         d_in + (kernel_size - 1) * (dilation - 1)) / 2)
     assert padding >= 0, "Padding value must be greater than or equal to 0."
 
     return padding
@@ -102,10 +101,10 @@ class TransEncoder_Conv1d_Act_block(nn.Module):
                                            nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout,
                                            drop_path=drop_path, activation=activation, 
                                            normalize_before=normalize_before)
-        padding = calculate_conv1d_padding(stride=1, kernel_size=kernel, 
+        padding = calculate_conv1d_padding(stride=3, kernel_size=kernel, 
                                            d_in=d_model, d_out=d_model)
         self.conv1d = nn.Conv1d(in_channels=sequence_length, out_channels=sequence_length, 
-                                kernel_size=kernel, stride=1, padding=padding)
+                                kernel_size=kernel, stride=3, padding=padding)
         self.activation = _get_activation_fn(activation)
     
     def forward(self, src: Tensor,
@@ -114,7 +113,8 @@ class TransEncoder_Conv1d_Act_block(nn.Module):
         # src: [B, L, Embedding] 
         # L is the sequence length; Embedding is the embedding dimension; B is the batch size
 
-        x = self.encoder(src, src_key_padding_mask, pos_embed)
+        x = self.encoder(src=src, src_key_padding_mask=src_key_padding_mask, 
+                         pos=pos_embed)
         x = self.conv1d(x)
         return self.activation(x)
 
@@ -142,7 +142,6 @@ class Encoder(nn.Module):
         block_list = []
         for _ in range(num_blocks):
             block_list.append(TransEncoder_Conv1d_Act_block(**block_params))
-            block_params["d_model"] /= 2
         
         self.blocks = nn.ModuleList(block_list)
         self.embed_dim = block_params["d_model"]
@@ -174,14 +173,14 @@ class Encoder(nn.Module):
 class TransDecoder_Conv1d_Act_block(nn.Module):
     def __init__(self, num_layers=4, d_model=512, nhead=8, dim_feedforward=2048, dropout=0.1,
                  drop_path=0.4, activation="relu", normalize_before=True,
-                 kernel=7, sequence_length=64) -> None:
+                 kernel=7, sequence_length=64, kdim=None, vdim=None) -> None:
         super(TransDecoder_Conv1d_Act_block, self).__init__()
 
         deoder_norm = nn.LayerNorm(d_model) if normalize_before else None
         self.decoder = Transformer_Decoder(num_layers=num_layers, norm=deoder_norm, d_model=d_model,
                                            nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout,
                                            drop_path=drop_path, activation=activation,
-                                           normalize_before=normalize_before)
+                                           normalize_before=normalize_before, kdim=kdim, vdim=vdim)
         padding = calculate_conv1d_padding(stride=1, kernel_size=kernel,
                                            d_in=d_model, d_out=d_model)
         self.conv1d = nn.Conv1d(in_channels=sequence_length, out_channels=sequence_length,
@@ -208,7 +207,7 @@ class Decoder(nn.Module):
     def __init__(self, num_blocks=3, num_layers=4, d_model=512, nhead=8, 
                  dim_feedforward=2048, dropout=0.1,
                  drop_path=0.4, activation="relu", normalize_before=True,
-                 kernel=7, sequence_length=32) -> None:
+                 kernel=7, sequence_length=32, kdim=None, vdim=None) -> None:
         super(Decoder, self).__init__()
 
         block_params = {
@@ -221,7 +220,9 @@ class Decoder(nn.Module):
             "activation": activation,
             "normalize_before": normalize_before,
             "kernel": kernel,
-            "sequence_length": sequence_length
+            "sequence_length": sequence_length,
+            "kdim": kdim,
+            "vdim": vdim,
         }
 
         block_list = [TransDecoder_Conv1d_Act_block(**block_params) 
@@ -279,6 +280,8 @@ class Transformer_Temp_2_Freq(nn.Module):
             "dropout": cfg["dropout"],
             "drop_path": cfg["drop_path"],
             "sequence_length": cfg["T2F_num_queries"],
+            "kdim": cfg["T2F_encoder_embed_dim"],
+            "vdim": cfg["T2F_encoder_embed_dim"],
         }
 
         self.reduce_dim_conv = nn.Conv2d(in_channels=cfg["T2F_encoder_sequence_length"],
@@ -291,11 +294,11 @@ class Transformer_Temp_2_Freq(nn.Module):
         self.query_embed = nn.Embedding(cfg["T2F_num_queries"], self.decoder_cfg["d_model"])
         
         self.encoder_pos = build_position_encoding(type=pos_type, 
-                                                   d_model=self.encoder_cfg["d_model"])
+                                                   embed_dim=self.encoder_cfg["d_model"])
         self.decoder_pos = build_position_encoding(type=pos_type,
-                                                   d_model=self.encoder_cfg["d_model"])
+                                                   embed_dim=self.encoder_cfg["d_model"])
         self.query_pos = build_position_encoding(type=pos_type,
-                                                 d_model=self.decoder_cfg["d_model"])
+                                                 embed_dim=self.decoder_cfg["d_model"])
         
         self.classify_head = nn.Parameter(torch.randn(cfg["T2F_num_queries"], 
                                                       cfg["T2F_decoder_embed_dim"], 
