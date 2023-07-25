@@ -220,15 +220,13 @@ def main(args):
         # train
         train_loss_dict, step_acc = train_one_epoch(model=model, data_loader=data_loader_train, 
                                                     criterion=criterion, optimizer=optimizer, 
-                                                    device=device, epoch=epoch, scaler=scaler,
-                                                    steps=args.time_step)
+                                                    device=device, epoch=epoch, scaler=scaler)
         print(str(step_acc))
         scheduler.step()
 
         # validation
         test_loss_dict, val_step_acc = evaluate(model=model, data_loader=data_loader_val, 
-                                                criterion=criterion, device=device, 
-                                                steps=args.time_step)
+                                                criterion=criterion, device=device)
         print(str(val_step_acc))
         
         # write results

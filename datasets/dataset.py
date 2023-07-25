@@ -384,12 +384,13 @@ class Temporal_to_Freq_data_multi_env(Dataset):
                 data = self.h5py_to_dict(f)
             
             if self.cache:
-                label = data["label_frame"]
-                data_len[i] = data["label_frame"].shape[0] - self.time_step + 1
-                data = np.stack([data["data_frame_I"][:, :], data["data_frame_Q"][:, :]], axis=1)
+                label = data["label_frame"][:50000, :]
+                data = np.stack([data["data_frame_I"][:50000, :], 
+                                 data["data_frame_Q"][:50000, :]], axis=1)
                 assert data.shape[0] == label.shape[0], "data and label must have the same length."
                 data_dict[i] = data.astype(np.float16)
                 label_dict[i] = label.astype(int)
+                data_len[i] = data_dict[i].shape[0] - self.time_step + 1
             else:
                 data_dict[i] = None
                 data_len[i] = data["data_frame_I"].shape[0] - self.time_step + 1
@@ -398,7 +399,7 @@ class Temporal_to_Freq_data_multi_env(Dataset):
         return data_dict, label_dict, data_len, min_len
 
     def __len__(self):
-        return len(self.data_files)
+        return len(self.data_files) * 24
     
     def __getitem__(self, index):
         """
@@ -408,6 +409,7 @@ class Temporal_to_Freq_data_multi_env(Dataset):
             tuple: (data, label) where data is the info within the time steps of the data and
             label is the frequency occupancy of the data within the time steps.
         """
+        index = index % len(self.data_files)
         time_step = np.random.randint(self.data_len[index])
         if self.data_dict is None:
             with h5py.File(self.data_files[index], 'r') as f:
@@ -419,11 +421,13 @@ class Temporal_to_Freq_data_multi_env(Dataset):
         else:
             data = self.data_dict[index][time_step:time_step + self.time_step, ...]
             label = self.label_dict[index][time_step:time_step + self.time_step, ...]
-        return data, label, index
+        return data, label
     
     @staticmethod
     def collate_fn(batch):
-        data, label, index = list(zip(*batch))
-        return torch.tensor(data).float(), torch.tensor(label).long(), \
-               torch.tensor(index).int()
+        data, label = list(zip(*batch))
+        data = np.stack(data, axis=0)
+        label = np.stack(label, axis=0)
+        return torch.from_numpy(data).float(), \
+               torch.from_numpy(label).float()
     

@@ -1,12 +1,14 @@
 import torch
 import torch.nn as nn
 from torch import Tensor
+import torch.nn.functional as F
+import numpy as np
 
 
 class Steps_BCELoss(nn.Module):
     def __init__(self):
         super(Steps_BCELoss, self).__init__()
-        self.bce = nn.BCELoss(reduction="sum")
+        self.bce = nn.BCEWithLogitsLoss(reduction="sum")
     
     def forward(self, pred: Tensor, targets: Tensor):
         _, l, _ = targets.shape
@@ -35,9 +37,10 @@ def Steps_Accuracy(pred: Tensor, targets: Tensor):
 
     acc_steps = []
     for i in range(l):
-        acc_steps.append(torch.eq(pred[:, i, :].round(), 
-                                  targets[:, i, :]).sum().float() / (b * n))
-    return acc_steps
+        acc_steps.append(torch.eq(F.sigmoid(pred[:, i, :]).round(), 
+                                  targets[:, i, :]).sum().float(). \
+                                    detach().cpu().numpy() / (b * n))
+    return np.array(acc_steps)
 
 
 class Temporal_Freq_Loss(nn.Module):
@@ -67,8 +70,8 @@ class Temporal_Freq_Loss(nn.Module):
         #     "time_step_weights length should be the same as time_step"
 
         # Calculate the loss
-        loss_steps = self.loss(pred, targets, reduction="none").to(device)
-        loss = torch.sum(loss_steps * self.weights)
+        loss_steps = self.loss(pred, targets).to(device)
+        loss = torch.sum(loss_steps)
         acc_steps = Steps_Accuracy(pred, targets)
         return loss, acc_steps
     

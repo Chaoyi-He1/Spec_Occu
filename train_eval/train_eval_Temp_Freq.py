@@ -9,7 +9,7 @@ from typing import Iterable
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
-                    device: torch.device, epoch: int, max_norm: float = 0,
+                    device: torch.device, epoch: int, max_norm: float = 0.1,
                     scaler=None):
     model.train()
     criterion.train()
@@ -32,7 +32,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             acc = acc_steps.mean()
 
         # reduce loss over all GPUs for logging purposes
-        assert acc_steps.len() == l, \
+        assert acc_steps.size() == l, \
             "acc_steps shape should be [time_step, ]"
         loss_reduced = reduce_loss(loss)
         acc_reduced = reduce_loss(acc)

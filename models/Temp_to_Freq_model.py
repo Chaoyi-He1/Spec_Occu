@@ -319,7 +319,7 @@ class Transformer_Temp_2_Freq(nn.Module):
         hs = self.decoder(tgt, memory, pos_embed=decoder_pos_embed, query_pos_embed=query_pos_embed)
 
         pred_cls = torch.einsum("bnd,ndc->bnc", hs, self.classify_head)
-        return F.sigmoid(pred_cls)
+        return pred_cls
 
 
 def build_T2F(cfg: dict = None, pos_type: str = "sine") -> Transformer_Temp_2_Freq:
