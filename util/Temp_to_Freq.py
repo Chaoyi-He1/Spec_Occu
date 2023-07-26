@@ -13,34 +13,12 @@ class Steps_BCELoss(nn.Module):
     def forward(self, pred: Tensor, targets: Tensor):
         _, l, _ = targets.shape
         device = targets.device
-        loss_steps = []
-        for i in range(l):
-            loss_steps.append(self.bce(pred[:, i, :], targets[:, i, :]))
-        loss = torch.as_tensor(loss_steps).to(device)
+        # loss_steps = []
+        # for i in range(l):
+        #     loss_steps.append(self.bce(pred[:, i, :], targets[:, i, :]))
+        # loss_steps = torch.as_tensor(loss_steps).to(device)
+        loss = self.bce(pred, targets)
         return loss
-
-
-@torch.no_grad()
-def Steps_Accuracy(pred: Tensor, targets: Tensor):
-    """
-    Calculate the accuracy of the temporal to frequency labels.
-    :param pred: Tensor [B, time_step, num_freq]
-    :param targets: Tensor [B, time_step, num_freq], 
-        targets is the ground truth of the frequency occupancy labels
-
-    :return: Steps_Accuracy: Tensor, the temporal to frequency accuracy
-    """
-    b, l, n = targets.shape
-
-    assert pred.shape == (b, l, n), \
-        "pred shape should be [B, time_step, num_freq]"
-
-    acc_steps = []
-    for i in range(l):
-        acc_steps.append(torch.eq(F.sigmoid(pred[:, i, :]).round(), 
-                                  targets[:, i, :]).sum().float(). \
-                                    detach().cpu().numpy() / (b * n))
-    return np.array(acc_steps)
 
 
 class Temporal_Freq_Loss(nn.Module):
@@ -70,8 +48,29 @@ class Temporal_Freq_Loss(nn.Module):
         #     "time_step_weights length should be the same as time_step"
 
         # Calculate the loss
-        loss_steps = self.loss(pred, targets).to(device)
-        loss = torch.sum(loss_steps)
+        loss = self.loss(pred, targets)
+
         acc_steps = Steps_Accuracy(pred, targets)
         return loss, acc_steps
     
+
+@torch.no_grad()
+def Steps_Accuracy(pred: Tensor, targets: Tensor):
+    """
+    Calculate the accuracy of the temporal to frequency labels.
+    :param pred: Tensor [B, time_step, num_freq]
+    :param targets: Tensor [B, time_step, num_freq], 
+        targets is the ground truth of the frequency occupancy labels
+
+    :return: Steps_Accuracy: Tensor, the temporal to frequency accuracy
+    """
+    b, l, n = targets.shape
+
+    assert pred.shape == (b, l, n), \
+        "pred shape should be [B, time_step, num_freq]"
+
+    acc_steps = []
+    for i in range(l):
+        acc_steps.append(torch.eq(F.sigmoid(pred[:, i, :]).round(), 
+                                  targets[:, i, :]).sum().float() / (b * n))
+    return torch.stack(acc_steps)

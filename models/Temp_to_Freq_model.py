@@ -297,8 +297,6 @@ class Transformer_Temp_2_Freq(nn.Module):
                                                    embed_dim=self.encoder_cfg["d_model"])
         self.decoder_pos = build_position_encoding(type=pos_type,
                                                    embed_dim=self.encoder_cfg["d_model"])
-        self.query_pos = build_position_encoding(type=pos_type,
-                                                 embed_dim=self.decoder_cfg["d_model"])
         
         self.classify_head = nn.Parameter(torch.randn(cfg["T2F_num_queries"], 
                                                       cfg["T2F_decoder_embed_dim"], 
@@ -311,12 +309,11 @@ class Transformer_Temp_2_Freq(nn.Module):
         memory = self.encoder(src, src_mask, src_pos_embed)
 
         query_embed = self.query_embed.weight.unsqueeze(0).repeat(src.shape[0], 1, 1)
-        query_pos_embed = self.query_pos(query_embed)
 
         tgt = torch.zeros_like(query_embed)
         decoder_pos_embed = self.decoder_pos(memory)
         # hs: [B, num_queries, decoder_embed_model]
-        hs = self.decoder(tgt, memory, pos_embed=decoder_pos_embed, query_pos_embed=query_pos_embed)
+        hs = self.decoder(tgt, memory, pos_embed=decoder_pos_embed, query_pos_embed=query_embed)
 
         pred_cls = torch.einsum("bnd,ndc->bnc", hs, self.classify_head)
         return pred_cls

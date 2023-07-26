@@ -189,7 +189,7 @@ def main(args):
     # model info
     params_to_optimize = []
     n_parameters, layers = 0, 0
-    for p in model.parameters():
+    for p in model.module.parameters():
         n_parameters += p.numel()
         layers += 1
         if p.requires_grad:
@@ -220,13 +220,15 @@ def main(args):
         # train
         train_loss_dict, step_acc = train_one_epoch(model=model, data_loader=data_loader_train, 
                                                     criterion=criterion, optimizer=optimizer, 
-                                                    device=device, epoch=epoch, scaler=scaler)
+                                                    device=device, epoch=epoch, scaler=scaler,
+                                                    steps=cfg["T2F_encoder_sequence_length"])
         print(str(step_acc))
         scheduler.step()
 
         # validation
         test_loss_dict, val_step_acc = evaluate(model=model, data_loader=data_loader_val, 
-                                                criterion=criterion, device=device)
+                                                criterion=criterion, device=device,
+                                                steps=cfg["T2F_encoder_sequence_length"])
         print(str(val_step_acc))
         
         # write results

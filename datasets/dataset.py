@@ -377,7 +377,7 @@ class Temporal_to_Freq_data_multi_env(Dataset):
         for i, data_file_path in enumerate(self.data_files):
             print("Loading data from %s ... (%d / %d)" % 
                   (data_file_path, i, len(self.data_files)))
-            # if "train_20" not in data_file_path:
+            # if ("20" not in data_file_path) and ("21" not in data_file_path):
             #     continue
             # continue
             with h5py.File(data_file_path, 'r') as f:
@@ -399,7 +399,7 @@ class Temporal_to_Freq_data_multi_env(Dataset):
         return data_dict, label_dict, data_len, min_len
 
     def __len__(self):
-        return len(self.data_files) * 24
+        return len(self.label_dict) * 24
     
     def __getitem__(self, index):
         """
@@ -409,7 +409,7 @@ class Temporal_to_Freq_data_multi_env(Dataset):
             tuple: (data, label) where data is the info within the time steps of the data and
             label is the frequency occupancy of the data within the time steps.
         """
-        index = index % len(self.data_files)
+        # index = 12
         time_step = np.random.randint(self.data_len[index])
         if self.data_dict is None:
             with h5py.File(self.data_files[index], 'r') as f:
