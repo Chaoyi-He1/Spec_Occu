@@ -377,16 +377,16 @@ class Temporal_to_Freq_data_multi_env(Dataset):
         for i, data_file_path in enumerate(self.data_files):
             print("Loading data from %s ... (%d / %d)" % 
                   (data_file_path, i, len(self.data_files)))
-            # if ("20" not in data_file_path) and ("21" not in data_file_path):
-            #     continue
+            if ("20" not in data_file_path) and ("21" not in data_file_path):
+                continue
             # continue
             with h5py.File(data_file_path, 'r') as f:
                 data = self.h5py_to_dict(f)
             
             if self.cache:
-                label = data["label_frame"][:50000, :]
-                data = np.stack([data["data_frame_I"][:50000, :], 
-                                 data["data_frame_Q"][:50000, :]], axis=1)
+                label = data["label_frame"][:20000, :]
+                data = np.stack([data["data_frame_I"][:20000, :], 
+                                 data["data_frame_Q"][:20000, :]], axis=1)
                 assert data.shape[0] == label.shape[0], "data and label must have the same length."
                 data_dict[i] = data.astype(np.float16)
                 label_dict[i] = label.astype(int)
@@ -409,8 +409,8 @@ class Temporal_to_Freq_data_multi_env(Dataset):
             tuple: (data, label) where data is the info within the time steps of the data and
             label is the frequency occupancy of the data within the time steps.
         """
-        # index = 12
-        index = index % len(self.label_dict)
+        index = 12
+        # index = index % len(self.label_dict)
         time_step = np.random.randint(self.data_len[index])
         if self.data_dict is None:
             with h5py.File(self.data_files[index], 'r') as f:
