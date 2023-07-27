@@ -399,7 +399,7 @@ class Temporal_to_Freq_data_multi_env(Dataset):
         return data_dict, label_dict, data_len, min_len
 
     def __len__(self):
-        return len(self.label_dict) * 24
+        return len(self.label_dict) * 96
     
     def __getitem__(self, index):
         """
@@ -410,6 +410,7 @@ class Temporal_to_Freq_data_multi_env(Dataset):
             label is the frequency occupancy of the data within the time steps.
         """
         # index = 12
+        index = index % len(self.label_dict)
         time_step = np.random.randint(self.data_len[index])
         if self.data_dict is None:
             with h5py.File(self.data_files[index], 'r') as f:

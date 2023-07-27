@@ -20,7 +20,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     Step_Predict = Step_Prediction(num_steps=steps)
     header = 'Epoch: [{}]'.format(epoch)
 
-    for i, (temporal, targets) in enumerate(metric_logger.log_every(data_loader, 10, header)):
+    for i, (temporal, targets) in enumerate(metric_logger.log_every(data_loader, 14, header)):
         temporal = temporal.to(device)
         targets = targets.to(device)
 

@@ -26,10 +26,10 @@ num_T2F_encoder_layers: 4
 num_T2F_encoder_blocks: 2
 T2F_encoder_embed_dim: 1024
 T2F_encoder_nhead: 4
-T2F_encoder_sequence_length: 64
+T2F_encoder_sequence_length: 32
 num_T2F_decoder_layers: 4
 num_T2F_decoder_blocks: 2
 T2F_decoder_embed_dim: 512
 T2F_decoder_nhead: 4
-T2F_num_queries: 64 # number of queries for the decoder, should be equal to the number of encoder_sequence_length
+T2F_num_queries: 32 # number of queries for the decoder, should be equal to the number of encoder_sequence_length
 T2F_num_classes: 8
