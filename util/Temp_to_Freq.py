@@ -8,7 +8,7 @@ import numpy as np
 class Steps_BCELoss(nn.Module):
     def __init__(self):
         super(Steps_BCELoss, self).__init__()
-        self.bce = nn.BCEWithLogitsLoss(reduction="sum")
+        self.bce = nn.BCEWithLogitsLoss(reduction="mean")
     
     def forward(self, pred: Tensor, targets: Tensor):
         _, l, _ = targets.shape
