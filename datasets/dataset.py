@@ -384,9 +384,9 @@ class Temporal_to_Freq_data_multi_env(Dataset):
                 data = self.h5py_to_dict(f)
             
             if self.cache:
-                label = data["label_frame"][:20000, :]
-                data = np.stack([data["data_frame_I"][:20000, :], 
-                                 data["data_frame_Q"][:20000, :]], axis=1)
+                label = data["label_frame"][:10000, :]
+                data = np.stack([data["data_frame_I"][:10000, :], 
+                                 data["data_frame_Q"][:10000, :]], axis=1)
                 assert data.shape[0] == label.shape[0], "data and label must have the same length."
                 data_dict[i] = data.astype(np.float16)
                 label_dict[i] = label.astype(int)
