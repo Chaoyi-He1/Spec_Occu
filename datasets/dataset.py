@@ -409,8 +409,8 @@ class Temporal_to_Freq_data_multi_env(Dataset):
             tuple: (data, label) where data is the info within the time steps of the data and
             label is the frequency occupancy of the data within the time steps.
         """
-        index = 12
-        # index = index % len(self.label_dict)
+        # index = 12
+        index = index % len(self.label_dict)
         time_step = np.random.randint(self.data_len[index])
         if self.data_dict is None:
             with h5py.File(self.data_files[index], 'r') as f:
