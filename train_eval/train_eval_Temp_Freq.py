@@ -20,7 +20,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     Step_Predict = Step_Prediction(num_steps=steps)
     header = 'Epoch: [{}]'.format(epoch)
 
-    for i, (temporal, targets) in enumerate(metric_logger.log_every(data_loader, 14, header)):
+    for i, (temporal, targets) in enumerate(metric_logger.log_every(data_loader, 20, header)):
         temporal = temporal.to(device)
         targets = targets.to(device)
 
@@ -86,7 +86,7 @@ def evaluate(model: torch.nn.Module, criterion: torch.nn.Module,
     metric_logger.add_meter('acc', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Test:'
 
-    for i, (temporal, targets) in enumerate(metric_logger.log_every(data_loader, 10, header)):
+    for i, (temporal, targets) in enumerate(metric_logger.log_every(data_loader, 20, header)):
         temporal = temporal.to(device)
         targets = targets.to(device)
 

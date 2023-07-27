@@ -50,7 +50,7 @@ def get_args_parser():
     parser.add_argument('--lrf', default=0.01, type=float)
     parser.add_argument('--weight_decay', default=0.0, type=float)
     parser.add_argument('--epochs', default=300, type=int)
-    parser.add_argument('--batch_size', default=32, type=int)
+    parser.add_argument('--batch_size', default=64, type=int)
     parser.add_argument('--num_workers', default=8, type=int)
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
@@ -62,7 +62,7 @@ def get_args_parser():
     parser.add_argument('--output-dir', default='weights', help='path where to save, empty for no saving')
 
     # distributed training parameters
-    parser.add_argument('--world_size', default=2, type=int, help='number of distributed processes')
+    parser.add_argument('--world_size', default=8, type=int, help='number of distributed processes')
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
     parser.add_argument('--amp', action='store_false', help='use mixed precision')
     
