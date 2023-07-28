@@ -384,9 +384,11 @@ class Temporal_to_Freq_data_multi_env(Dataset):
                 data = self.h5py_to_dict(f)
             
             if self.cache:
-                label = data["label_frame"][:10000, :]
-                data = np.stack([data["data_frame_I"][:10000, :], 
-                                 data["data_frame_Q"][:10000, :]], axis=1)
+                start_index = np.random.randint(0, 
+                                                data["data_frame_I"].shape[0] - self.time_step + 1)
+                label = data["label_frame"][start_index:start_index + 10000, :]
+                data = np.stack([data["data_frame_I"][start_index:start_index + 10000, :], 
+                                 data["data_frame_Q"][start_index:start_index + 10000, :]], axis=1)
                 assert data.shape[0] == label.shape[0], "data and label must have the same length."
                 data_dict[i] = data.astype(np.float16)
                 label_dict[i] = label.astype(int)
@@ -431,4 +433,14 @@ class Temporal_to_Freq_data_multi_env(Dataset):
         label = np.stack(label, axis=0)
         return torch.from_numpy(data).float(), \
                torch.from_numpy(label).float()
-    
+
+
+class Diffusion_multi_env(Dataset):
+    def __init__(self, data_folder_path: str = "", cache: bool = True, in_type: str = "1d",
+                 past_steps: int = 32, future_steps: int = 12, train: bool = True, 
+                 num_frames_per_clip: int = 256, temp_dim: int = 1024) -> None:
+        super(Diffusion_multi_env, self).__init__()
+        assert os.path.isdir(data_folder_path), "path '{}' does not exist.".format(data_folder_path)
+        self.data_files = [os.path.join(data_folder_path, f) for f in os.listdir(data_folder_path)]
+        self.data_files.sort()
+
