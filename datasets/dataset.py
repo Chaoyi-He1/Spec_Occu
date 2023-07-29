@@ -385,7 +385,7 @@ class Temporal_to_Freq_data_multi_env(Dataset):
             
             if self.cache:
                 start_index = np.random.randint(0, 
-                                                data["data_frame_I"].shape[0] - self.time_step + 1)
+                                                data["data_frame_I"].shape[0] - 20000)
                 label = data["label_frame"][start_index:start_index + 10000, :]
                 data = np.stack([data["data_frame_I"][start_index:start_index + 10000, :], 
                                  data["data_frame_Q"][start_index:start_index + 10000, :]], axis=1)
