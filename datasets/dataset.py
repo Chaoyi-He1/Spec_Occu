@@ -436,11 +436,21 @@ class Temporal_to_Freq_data_multi_env(Dataset):
 
 
 class Diffusion_multi_env(Dataset):
-    def __init__(self, data_folder_path: str = "", cache: bool = True, in_type: str = "1d",
+    def __init__(self, data_folder_path: str = "", cache: bool = True, 
                  past_steps: int = 32, future_steps: int = 12, train: bool = True, 
-                 num_frames_per_clip: int = 256, temp_dim: int = 1024) -> None:
+                 temp_dim: int = 1024) -> None:
         super(Diffusion_multi_env, self).__init__()
         assert os.path.isdir(data_folder_path), "path '{}' does not exist.".format(data_folder_path)
         self.data_files = [os.path.join(data_folder_path, f) for f in os.listdir(data_folder_path)]
         self.data_files.sort()
+        self.past_steps = past_steps
+        self.future_steps = future_steps
+        self.train = train
+        self.temp_dim = temp_dim
+        self.cache = cache
+        self.total_time_steps = past_steps + future_steps
+
+        (self.data_dict, self.label_dict,
+         self.data_len, self.min_len) = self.cache_data()
+
 
