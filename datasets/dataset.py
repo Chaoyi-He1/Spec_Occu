@@ -419,8 +419,8 @@ class Temporal_to_Freq_data_multi_env(Dataset):
                 data = self.h5py_to_dict(f)
             real = data["data_frame_I"][time_step:time_step + self.time_step, :]
             imag = data["data_frame_Q"][time_step:time_step + self.time_step, :]
-            data = np.stack([real, imag], axis=1)
             label = data["label_frame"][time_step:time_step + self.time_step, :]
+            data = np.stack([real, imag], axis=1)
         else:
             data = self.data_dict[index][time_step:time_step + self.time_step, ...]
             label = self.label_dict[index][time_step:time_step + self.time_step, ...]
@@ -453,4 +453,86 @@ class Diffusion_multi_env(Dataset):
         (self.data_dict, self.label_dict,
          self.data_len, self.min_len) = self.cache_data()
 
-
+    def h5py_to_dict(self, h5_obj):
+        if isinstance(h5_obj, h5py.File) or isinstance(h5_obj, h5py.Group):
+            data = {}
+            for key in h5_obj.keys():
+                data[key] = self.h5py_to_dict(h5_obj[key])
+            return data
+        elif isinstance(h5_obj, h5py.Dataset):
+            if len(h5_obj.shape) == 2:  # Check if the dataset represents a matrix
+                return np.transpose(h5_obj[()])  # Transpose the matrix
+            else:
+                return h5_obj[()]
+        else:
+            return h5_obj
+    
+    def cache_data(self):
+        data_dict = {}
+        label_dict = {}
+        data_len = {}
+        min_len = np.inf
+        for i, data_file_path in enumerate(self.data_files):
+            print("Loading data from %s ... (%d / %d)" % 
+                  (data_file_path, i, len(self.data_files)))
+            with h5py.File(data_file_path, 'r') as f:
+                data = self.h5py_to_dict(f)
+            
+            if self.cache:
+                start_index = np.random.randint(0,
+                                                data["data_frame_I"].shape[0] - 20000)
+                label = data["label_frame"][start_index:start_index + 10000, ...]
+                data = np.stack([data["data_frame_I"][start_index:start_index + 10000, ...],
+                                 data["data_frame_Q"][start_index:start_index + 10000, ...]], axis=1)
+                assert data.shape[0] == label.shape[0], "data and label must have the same length."
+                data_dict[i] = data.astype(np.float16)
+                label_dict[i] = label.astype(int)
+                data_len[i] = data_dict[i].shape[0] - self.total_time_steps + 1
+            else:
+                data_dict[i] = None
+                data_len[i] = data["data_frame_I"].shape[0] - self.total_time_steps + 1
+                label_dict[i] = data["label_frame"]
+            min_len = min(min_len, data_len[i])
+        return data_dict, label_dict, data_len, min_len
+    
+    def __len__(self):
+        return len(self.label_dict) * 768
+    
+    def __getitem__(self, index):
+        """
+        Args:
+            index (int): Index
+        Returns:
+            tuple: (data, label) where data is the info within the time steps of the data and
+            label is the frequency occupancy of the data within the time steps.
+        """
+        index = index % len(self.label_dict)
+        time_step = np.random.randint(self.data_len[index])
+        if self.data_dict is None:
+            with h5py.File(self.data_files[index], 'r') as f:
+                data = self.h5py_to_dict(f)
+            real = data["data_frame_I"][time_step:time_step + self.total_time_steps, :]
+            imag = data["data_frame_Q"][time_step:time_step + self.total_time_steps, :]
+            label = data["label_frame"][time_step:time_step + self.total_time_steps, :]
+            data = np.stack([real, imag], axis=1)
+        else:
+            data = self.data_dict[index][time_step:time_step + self.total_time_steps, ...]
+            label = self.label_dict[index][time_step:time_step + self.total_time_steps, ...]
+        
+        past_data = data[:self.past_steps, ...]
+        future_data = data[self.past_steps:, ...]
+        past_label = label[:self.past_steps, ...]
+        future_label = label[self.past_steps:, ...]
+        return past_data, past_label, future_data, future_label
+    
+    @staticmethod
+    def collate_fn(batch):
+        past_data, past_label, future_data, future_label = list(zip(*batch))
+        past_data = np.stack(past_data, axis=0)
+        past_label = np.stack(past_label, axis=0)
+        future_data = np.stack(future_data, axis=0)
+        future_label = np.stack(future_label, axis=0)
+        return torch.from_numpy(past_data).float(), \
+               torch.from_numpy(past_label).float(), \
+               torch.from_numpy(future_data).float(), \
+               torch.from_numpy(future_label).float()
