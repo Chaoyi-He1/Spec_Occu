@@ -125,7 +125,7 @@ def main(args):
     
     # dataloader
     print("Contrastive dataloader generating...")
-    nw = min([os.cpu_count(), args.batch_size if args.batch_size > 1 else 0, 8])  # number of wor-kers
+    nw = min([os.cpu_count(), args.batch_size if args.batch_size > 1 else 0, 8])  # number of workers
     if args.rank in [-1, 0]:
         print('Using %g dataloader workers' % nw)
     data_loader_train = torch.utils.data.DataLoader(dataset_train, batch_sampler=batch_sampler_train, 

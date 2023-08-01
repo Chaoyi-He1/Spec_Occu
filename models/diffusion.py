@@ -243,13 +243,12 @@ class LinearDecoder(Module):
 
 
 def build_diffusion_model(diffnet: str = "TransformerConcatLinear",
-                          Temporal_dim: int = 1024, feature_dim: int = 128, 
-                          num_trans_layers: int = 4, residual_trans: bool = True):
+                          cfg: dict = None):
     transformer_param = {
-        "point_dim": Temporal_dim,
-        "context_dim": feature_dim,
-        "tf_layer": num_trans_layers,
-        "residual": residual_trans,
+        "point_dim": cfg["Temporal_dim"],
+        "context_dim": cfg["feature_dim"],
+        "tf_layer": cfg["diffu_num_trans_layers"],
+        "residual": cfg["diffu_residual_trans"],
     }
     if diffnet == "TransformerConcatLinear":
         return TransformerConcatLinear(**transformer_param)
@@ -257,3 +256,5 @@ def build_diffusion_model(diffnet: str = "TransformerConcatLinear",
         return TransformerLinear(**transformer_param)
     elif diffnet == "LinearDecoder":
         return LinearDecoder()
+    else:
+        raise NotImplementedError

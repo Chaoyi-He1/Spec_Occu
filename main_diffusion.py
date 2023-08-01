@@ -23,6 +23,7 @@ import torch.multiprocessing
 import util.misc as utils
 from datasets.dataset import Diffusion_multi_env
 from models.diffusion import *
+from models.contrastive_model import *
 from train_eval.train_eval_contrast import *
 from util.diffusion import *
 
@@ -108,7 +109,7 @@ def main(args):
         cfg = yaml.load(f, Loader=yaml.FullLoader)
 
     # dataset generate
-    print("Contrastive dataset generating...")
+    print("Diffusion dataset generating...")
     dataset_train = Diffusion_multi_env(data_folder_path=args.train_path, 
                                         cache=args.cache_data,
                                         past_steps=cfg["contrast_sequence_length"],
@@ -121,6 +122,39 @@ def main(args):
                                       future_steps=args.time_step,
                                       train=False,
                                       temp_dim=cfg["Temporal_dim"])
+    
+    if args.distributed:
+        sampler_train = torch.utils.data.distributed.DistributedSampler(dataset_train)
+        sampler_val = torch.utils.data.distributed.DistributedSampler(dataset_val, shuffle=False)
+    else:
+        sampler_train = torch.utils.data.RandomSampler(dataset_train)
+        sampler_val = torch.utils.data.SequentialSampler(dataset_val)
+    
+    batch_sampler_train = torch.utils.data.BatchSampler(sampler_train, args.batch_size, drop_last=True)
+    batch_sampler_val = torch.utils.data.BatchSampler(sampler_val, args.batch_size, drop_last=True)
+
+    # dataloader
+    print("Diffusion model dataloader generating...")
+    nw = min([os.cpu_count(), args.batch_size if args.batch_size > 1 else 0, 8])  # number of workers
+    if args.rank in [-1, 0]:
+        print(f"Using {nw} dataloader workers every process")
+    data_loader_train = torch.utils.data.DataLoader(dataset_train, batch_sampler=batch_sampler_train, 
+                                                    collate_fn=dataset_train.collate_fn , num_workers=nw)
+    data_loader_val = torch.utils.data.DataLoader(dataset_val, batch_sampler=batch_sampler_val,
+                                                  collate_fn=dataset_val.collate_fn, num_workers=nw)
+    
+    # model
+    print("Diffusion model generating...")
+    variance = VarianceSchedule(num_steps=cfg["diffusion_num_steps"],
+                                mode=cfg["diffusion_schedule_mode"])
+    
+    model = build_diffusion_model(diffnet="TransformerConcatLinear", cfg=cfg)
+    diffusion_util = Diffusion_utils(var_sched=variance)
+    encoder = build_feature_extractor(cfg=cfg)
+    if args.rank in [-1, 0]:
+
+
+
 
 
 if __name__ == '__main__':

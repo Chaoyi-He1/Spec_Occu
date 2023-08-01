@@ -25,11 +25,15 @@ Encoder_attention: True    # use attention (True) or without attention for Encod
 num_T2F_encoder_layers: 4
 num_T2F_encoder_blocks: 4
 T2F_encoder_embed_dim: 1024
-T2F_encoder_nhead: 4
+T2F_encoder_nhead: 8
 T2F_encoder_sequence_length: 32
 num_T2F_decoder_layers: 4
 num_T2F_decoder_blocks: 4
 T2F_decoder_embed_dim: 512
-T2F_decoder_nhead: 4
+T2F_decoder_nhead: 8
 T2F_num_queries: 32 # number of queries for the decoder, should be equal to the number of encoder_sequence_length
 T2F_num_classes: 8
+
+# Diffusion model
+diffu_num_trans_layers: 12
+diffu_residual_trans: True

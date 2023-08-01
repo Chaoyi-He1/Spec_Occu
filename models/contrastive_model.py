@@ -508,5 +508,88 @@ class Encoder_Regressor(nn.Module):
         return pred.squeeze(-1)
 
 
+class Feature_Extractor(nn.Module):
+    def __init__(self, cfg: dict = None, pos_type: str = "sine", 
+                 in_type: str = "1d") -> None:
+        super(Encoder_Regressor, self).__init__()
+        assert cfg is not None, "cfg should be a dict"
+        self.AutoEncoder_cfg = {
+            "in_dim": (cfg["num_frames_per_clip"], cfg["Temporal_dim"]),
+            "in_channel": cfg["in_channels"],
+            "drop_path": cfg["drop_path"],
+            "with_atten": cfg["Encoder_attention"],
+        } if in_type == "2d" else {
+            "in_dim": cfg["Temporal_dim"],
+            "in_channel": cfg["in_channels"],
+            "drop_path": cfg["drop_path"],
+            "with_atten": cfg["Encoder_attention"],
+        }
+        self.encoder = Conv2d_AutoEncoder(**self.AutoEncoder_cfg) \
+            if in_type == "2d" else \
+                Conv1d_AutoEncoder(**self.AutoEncoder_cfg)
+        self.embed_dim = self.encoder.channel
+        self.frames_per_clip = cfg["num_frames_per_clip"]
+        self.in_dim = cfg["Temporal_dim"]
+        assert self.embed_dim == cfg["contrast_embed_dim"], \
+            "embed_dim should be the same as the output of Conv1d_AutoEncoder"
+        
+        if not cfg["contrast_attention"]:
+            self.AutoRegressive_cfg = {
+                "num_blocks": cfg["num_contrast_blocks"],
+                "feature_dim": cfg["feature_dim"],
+                "num_layers": cfg["num_contrast_layers"],
+                "d_model": self.embed_dim,
+                "nhead": cfg["nhead"],
+                "dropout": cfg["dropout"],
+                "drop_path": cfg["drop_path"],
+                "sequence_length": cfg["contrast_sequence_length"],
+                "dim_feedforward": cfg["dim_feedforward"],
+                "normalize_before": cfg["contrast_normalize_before"],
+                "pos_type": pos_type,
+            }
+        else:
+            self.AutoRegressive_cfg = {
+                "feature_dim": cfg["feature_dim"],
+                "num_layers": cfg["num_contrast_layers"],
+                "d_model": self.embed_dim,
+                "nhead": cfg["nhead"],
+                "dropout": cfg["dropout"],
+                "drop_path": cfg["drop_path"],
+                "sequence_length": cfg["contrast_sequence_length"],
+                "dim_feedforward": cfg["dim_feedforward"],
+                "normalize_before": cfg["contrast_normalize_before"],
+                "pos_type": pos_type,
+            }
+
+        self.regressor = Autoregressive(**self.AutoRegressive_cfg) if not cfg["contrast_attention"] else \
+                         Autoregressive_Attention(**self.AutoRegressive_cfg)
+
+        self.feature_dim = cfg["feature_dim"]
+
+    def forward(self, inputs: Tensor) -> Tensor:
+        # inputs: [B, L, in_dim]; 
+        # B is the batch size; L is the sequence length, in_dim is the input temporal dimension
+        # output: [B, feature_dim]
+
+        b, l, c, f_d, t_d = inputs.shape
+        device = inputs.device
+        # assert t_d == self.AutoEncoder_cfg["in_dim"], \
+        #     "Input temporal dimension should be the same as the in_dim in AutoEncoder"
+        # assert c == self.encoder.in_channel, \
+        #     "Input channel should be the same as the in_channel in AutoEncoder"
+        encoder_outputs = torch.stack([self.encoder(inputs[i, :, :, :, :])
+                                       for i in range(b)]).to(device)
+        # assert encoder_outputs.shape == (b, l, self.embed_dim), \
+        #     "Encoder output shape should be [B, L, Embedding]"
+
+        feature = self.regressor(encoder_outputs)  # [B, feature_dim]
+        
+        return feature
+
+
 def build_contrastive_model(cfg: dict = None, timestep: int = 12, pos_type: str = "sine") -> nn.Module:
     return Encoder_Regressor(cfg, timestep, pos_type)
+
+
+def build_feature_extractor(cfg: dict = None, pos_type: str = "sine", in_type: str = "1d") -> nn.Module:
+    return Feature_Extractor(cfg, pos_type, in_type)
