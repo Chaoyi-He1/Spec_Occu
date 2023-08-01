@@ -22,12 +22,12 @@ num_frames_per_clip: 64    # number of frames per block for the encoder
 Encoder_attention: True    # use attention (True) or without attention for Encoder residual blocks
 
 # Temporal to Frequency model
-num_T2F_encoder_layers: 4
-num_T2F_encoder_blocks: 4
+num_T2F_encoder_layers: 2
+num_T2F_encoder_blocks: 8
 T2F_encoder_embed_dim: 1024
 T2F_encoder_nhead: 8
 T2F_encoder_sequence_length: 32
-num_T2F_decoder_layers: 4
+num_T2F_decoder_layers: 1
 num_T2F_decoder_blocks: 4
 T2F_decoder_embed_dim: 512
 T2F_decoder_nhead: 8

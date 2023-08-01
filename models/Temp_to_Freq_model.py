@@ -122,8 +122,8 @@ class TransEncoder_Conv1d_Act_block(nn.Module):
 class Encoder(nn.Module):
     def __init__(self, num_blocks=3, num_layers=4, d_model=512, nhead=8, 
                  dim_feedforward=2048, dropout=0.1,
-                 drop_path=0.4, activation="relu", normalize_before=True,
-                 kernel=7, sequence_length=32) -> None:
+                 drop_path=0.4, activation="gelu", normalize_before=True,
+                 kernel=5, sequence_length=32) -> None:
         super(Encoder, self).__init__()
 
         block_params = {
@@ -206,8 +206,8 @@ class TransDecoder_Conv1d_Act_block(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, num_blocks=3, num_layers=4, d_model=512, nhead=8, 
                  dim_feedforward=2048, dropout=0.1,
-                 drop_path=0.4, activation="relu", normalize_before=True,
-                 kernel=7, sequence_length=32, kdim=None, vdim=None) -> None:
+                 drop_path=0.4, activation="gelu", normalize_before=True,
+                 kernel=5, sequence_length=32, kdim=None, vdim=None) -> None:
         super(Decoder, self).__init__()
 
         block_params = {

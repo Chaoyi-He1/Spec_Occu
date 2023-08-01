@@ -40,7 +40,7 @@ def get_args_parser():
 
     # Model parameters
     parser.add_argument('--resume', type=str, default='', help="initial weights path")  # weights/model_940.pth
-    parser.add_argument('--time-step', type=int, default=64, help="number of time steps to predict")
+    parser.add_argument('--time-step', type=int, default=32, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
     parser.add_argument('--positional-embedding', default='learned', choices=('sine', 'learned'),
                         help="type of positional embedding to use on top of the image features")
@@ -107,6 +107,10 @@ def main(args):
     # load hyper parameters
     with open(args.hpy) as f:
         cfg = yaml.load(f, Loader=yaml.FullLoader)
+    
+    # check if the sequence length from args is consistent with the cfg
+    assert args.time_step == cfg["T2F_encoder_sequence_length"], \
+        "The sequence length from args is not consistent with the cfg T2F_encoder_sequence_length."
 
     # dataset generate
     print("Diffusion dataset generating...")
@@ -148,13 +152,51 @@ def main(args):
     variance = VarianceSchedule(num_steps=cfg["diffusion_num_steps"],
                                 mode=cfg["diffusion_schedule_mode"])
     
-    model = build_diffusion_model(diffnet="TransformerConcatLinear", cfg=cfg)
+    diffusion_model = build_diffusion_model(diffnet="TransformerConcatLinear", cfg=cfg)
     diffusion_util = Diffusion_utils(var_sched=variance)
     encoder = build_feature_extractor(cfg=cfg)
     if args.rank in [-1, 0]:
+        x = torch.randn(args.batch_size, 
+                        args.time_step, 
+                        2, cfg["Temporal_dim"])
+        beta = torch.randn(args.batch_size,)
+        context = torch.randn(args.batch_size, cfg["feature_dim"])
+        tb_writer.add_graph(diffusion_model, (x, beta, context))
+    
+    # load previous model if resume training
+    start_epoch = 0
+    scaler = torch.cuda.amp.GradScaler() if args.amp else None
+    if args.resume.endswith(".pth"):
+        print("Resuming training from %s" % args.resume)
+        ckpt = torch.load(args.resume, map_location='cpu')
 
+        try:
+            ckpt["diffusion_model"] = {k: v for k, v in ckpt["diffusion_model"].items() 
+                                       if diffusion_model.state_dict()[k].numel() == v.numel()}
+            diffusion_model.load_state_dict(ckpt["diffusion_model"], strict=False)
 
+            ckpt["encoder"] = {k: v for k, v in ckpt["encoder"].items()
+                               if encoder.state_dict()[k].numel() == v.numel()}
+            encoder.load_state_dict(ckpt["encoder"], strict=False)
 
+            ckpt["diffusion_util"] = {k: v for k, v in ckpt["diffusion_util"].items()
+                                      if diffusion_util.state_dict()[k].numel() == v.numel()}
+            diffusion_util.load_state_dict(ckpt["diffusion_util"], strict=False)
+        
+        except KeyError as e:
+            s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
+                % (args.weights, args.hyp, args.weights)
+            raise KeyError(s) from e
+        
+        if args.rank in [-1, 0]:
+            # load results
+            if ckpt.get("training_results") is not None:
+                with open(results_file, "w") as file:
+                    file.write(ckpt["training_results"])  # write results.txt
+        
+        # epochs
+        start_epoch = ckpt["epoch"] + 1
+        
 
 
 if __name__ == '__main__':

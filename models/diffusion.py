@@ -80,13 +80,16 @@ class VarianceSchedule(Module):
 class TrajNet(Module):
 
     def __init__(self, point_dim: int = 1024, time_embed_dim: int = 256,
-                 context_dim: int = 256, 
+                 context_dim: int = 256, seq_len: int = 32,
                  residual: bool = True):
         super(TrajNet, self).__init__()
 
         self.act = F.leaky_relu
         self.residual = residual
         self.time_embed_dim = time_embed_dim
+        self.reduce_dim_conv = nn.Conv2d(in_channels=seq_len,
+                                         out_channels=seq_len,
+                                         kernel_size=(2, 1), stride=(1, 1), padding=(0, 0))
         self.layers = ModuleList([
             ConcatSquashLinear(point_dim, 2048, context_dim + time_embed_dim),
             ConcatSquashLinear(2048, 2048, context_dim + time_embed_dim),
@@ -106,6 +109,7 @@ class TrajNet(Module):
             context:  Shape latents. (B, F).
         """
         batch_size = x.size(0)
+        x = self.reduce_dim_conv(x).squeeze(-2)      # (B, N, seq_len)
         beta = beta.view(batch_size, 1, 1)          # (B, 1, 1)
         context = context.view(batch_size, 1, -1)   # (B, 1, F)
 
@@ -130,9 +134,12 @@ class TrajNet(Module):
 
 
 class TransformerConcatLinear(Module):
-    def __init__(self, point_dim, context_dim, tf_layer=4, residual=True):
+    def __init__(self, point_dim, context_dim, tf_layer=4, residual=True, seq_len=32):
         super().__init__()
         self.residual = residual
+        self.reduce_dim_conv = nn.Conv2d(in_channels=seq_len,
+                                         out_channels=seq_len,
+                                         kernel_size=(2, 1), stride=(1, 1), padding=(0, 0))
         self.pos_emb = PositionEmbeddingSine(2 * context_dim, normalize=True)
 
         self.concat1 = ConcatSquashLinear(dim_in=point_dim, dim_out=2 * context_dim, 
@@ -159,6 +166,7 @@ class TransformerConcatLinear(Module):
 
     def forward(self, x, beta, context):
         batch_size = x.size(0)
+        x = self.reduce_dim_conv(x).squeeze(-2)
         beta = beta.view(batch_size, 1, 1)          # (B, 1, 1)
         context = context.view(batch_size, 1, -1)   # (B, 1, F)
 
@@ -177,9 +185,12 @@ class TransformerConcatLinear(Module):
 
 
 class TransformerLinear(Module):
-    def __init__(self, point_dim, context_dim, tf_layer=4, residual=True) -> None:
+    def __init__(self, point_dim, context_dim, tf_layer=4, residual=True, seq_len=32) -> None:
         super().__init__()
         self.residual = residual
+        self.reduce_dim_conv = nn.Conv2d(in_channels=seq_len,
+                                         out_channels=seq_len,
+                                         kernel_size=(2, 1), stride=(1, 1), padding=(0, 0))
         self.pos_emb = PositionEmbeddingSine(context_dim, normalize=True)
 
         self.y_up = nn.Linear(point_dim, 2048)
@@ -196,10 +207,10 @@ class TransformerLinear(Module):
         self.transformer_encoder = Transformer_Encoder(**self.encoder_param)
 
         self.linear = nn.Linear(2048, point_dim)
-    
+     
     def forward(self, x, beta, context):
-
         batch_size = x.size(0)
+        x = self.reduce_dim_conv(x).squeeze(-2)
         beta = beta.view(batch_size, 1, 1)          # (B, 1, 1)
         context = context.view(batch_size, 1, -1)   # (B, 1, F)
 
@@ -218,9 +229,12 @@ class TransformerLinear(Module):
 
 
 class LinearDecoder(Module):
-    def __init__(self):
+    def __init__(self, seq_len=32):
             super().__init__()
             self.act = F.leaky_relu
+            self.reduce_dim_conv = nn.Conv2d(in_channels=seq_len,
+                                         out_channels=seq_len,
+                                         kernel_size=(2, 1), stride=(1, 1), padding=(0, 0))
             self.layers = ModuleList([
                 #nn.Linear(2, 64),
                 nn.Linear(32, 64),
@@ -234,6 +248,7 @@ class LinearDecoder(Module):
                 #nn.Linear(2, 64),
             ])
     def forward(self, code):
+        code = self.reduce_dim_conv(code).squeeze(-2)
         out = code
         for i, layer in enumerate(self.layers):
             out = layer(out)
@@ -249,12 +264,13 @@ def build_diffusion_model(diffnet: str = "TransformerConcatLinear",
         "context_dim": cfg["feature_dim"],
         "tf_layer": cfg["diffu_num_trans_layers"],
         "residual": cfg["diffu_residual_trans"],
+        "seq_len": cfg["T2F_encoder_sequence_length"]
     }
     if diffnet == "TransformerConcatLinear":
         return TransformerConcatLinear(**transformer_param)
     elif diffnet == "TransformerLinear":
         return TransformerLinear(**transformer_param)
     elif diffnet == "LinearDecoder":
-        return LinearDecoder()
+        return LinearDecoder(cfg["T2F_encoder_sequence_length"])
     else:
         raise NotImplementedError
