@@ -121,7 +121,7 @@ class TransEncoder_Conv1d_Act_block(nn.Module):
 
 class Encoder(nn.Module):
     def __init__(self, num_blocks=3, num_layers=4, d_model=512, nhead=8, 
-                 dim_feedforward=2048, dropout=0.1,
+                 dim_feedforward=512, dropout=0.1,
                  drop_path=0.4, activation="gelu", normalize_before=True,
                  kernel=5, sequence_length=32) -> None:
         super(Encoder, self).__init__()
@@ -298,7 +298,7 @@ class Transformer_Temp_2_Freq(nn.Module):
         self.decoder_pos = build_position_encoding(type=pos_type,
                                                    embed_dim=self.encoder_cfg["d_model"])
         
-        self.classify_head = nn.Parameter(torch.randn(cfg["T2F_num_queries"], 
+        self.classify_head = nn.parameter.Parameter(torch.randn(cfg["T2F_num_queries"], 
                                                       cfg["T2F_decoder_embed_dim"], 
                                                       cfg["T2F_num_classes"]))
         

@@ -224,6 +224,9 @@ def main(args):
         encoder = torch.nn.parallel.DistributedDataParallel(encoder, device_ids=[args.gpu])
         encoder_without_ddp = encoder.module
 
+        diffusion_util = torch.nn.parallel.DistributedDataParallel(diffusion_util, device_ids=[args.gpu])
+        diffusion_util_without_ddp = diffusion_util.module
+
     # model info
     params_to_optimize = []
     n_parameters, layers = 0, 0
@@ -256,7 +259,7 @@ def main(args):
     # start training
     print("Start training...")
     output_dir = Path(results_file)
-    best_loss, best_acc = float('inf'), 0.0
+    best_ADE_loss, best_FDE_loss = float('inf'), float('inf')
     start_time = time.time()
     for epoch in range(start_epoch, args.epochs + start_epoch):
         if args.distributed:
@@ -275,6 +278,60 @@ def main(args):
                                   device=device, scaler=scaler, repeat=cfg["diffusion_repeat"])
         
         # write results
+        log_stats = {**{f'train_{k}': v for k, v in train_loss_dict.items()},
+                     **{f'test_{k}': v for k, v in test_loss_dict.items()},
+                     'epoch': epoch}
+        if args.output_dir and utils.is_main_process():
+            with (results_file).open("a") as f:
+                f.write(json.dumps(log_stats) + "\n")
+        
+        # write tensorboard
+        if utils.is_main_process():
+            if tb_writer:
+                items = {
+                    **{f'train_{k}': v for k, v in train_loss_dict.items()},
+                    **{f'test_{k}': v for k, v in test_loss_dict.items()},
+                }
+                for k, v in items.items():
+                    tb_writer.add_scalar(k, v, epoch)
+        
+        # save model
+        if args.save_best:
+            # save best model
+            if test_loss_dict["ADE percentage"] < best_ADE_loss and \
+               test_loss_dict["FDE percentage"] < best_FDE_loss:
+                best_ADE_loss = test_loss_dict["loss"]
+                best_FDE_loss = test_loss_dict["acc"]
+
+                utils.save_on_master({
+                    "epoch": epoch,
+                    "diffusion_model": diffusion_model_without_ddp.state_dict() if args.distributed 
+                                       else diffusion_model.state_dict(),
+                    "encoder": encoder_without_ddp.state_dict() if args.distributed else encoder.state_dict(),
+                    "diffusion_util": diffusion_util_without_ddp.state_dict() if args.distributed
+                                      else diffusion_util.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "scaler": scaler.state_dict() if scaler is not None else None,
+                    "lr_scheduler": scheduler.state_dict(),
+                }, best)
+        else:
+            # save latest model
+            digits = len(str(args.epochs))
+            utils.save_on_master({
+                    "epoch": epoch,
+                    "diffusion_model": diffusion_model_without_ddp.state_dict() if args.distributed 
+                                       else diffusion_model.state_dict(),
+                    "encoder": encoder_without_ddp.state_dict() if args.distributed else encoder.state_dict(),
+                    "diffusion_util": diffusion_util_without_ddp.state_dict() if args.distributed
+                                      else diffusion_util.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "scaler": scaler.state_dict() if scaler is not None else None,
+                    "lr_scheduler": scheduler.state_dict(),
+                }, os.path.join(args.output_dir, 'model_{}.pth'.format(str(epoch).zfill(digits))))
+    
+    total_time = time.time() - start_time
+    total_time_str = str(datetime.timedelta(seconds=int(total_time)))
+    print('Training time {}'.format(total_time_str))
 
 
 if __name__ == '__main__':
