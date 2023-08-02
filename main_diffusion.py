@@ -24,7 +24,7 @@ import util.misc as utils
 from datasets.dataset import Diffusion_multi_env
 from models.diffusion import *
 from models.contrastive_model import *
-from train_eval.train_eval_contrast import *
+from train_eval.train_eval_diffusion import *
 from util.diffusion import *
 
 
@@ -196,7 +196,85 @@ def main(args):
         
         # epochs
         start_epoch = ckpt["epoch"] + 1
+        if args.epochs < start_epoch:
+            print('%s has been trained for %g epochs. Fine-tuning for %g additional epochs.' %
+                  (args.resume, ckpt['epoch'], args.epochs))
+        if args.amp and "scaler" in ckpt:
+            scaler.load_state_dict(ckpt["scaler"])
+        del ckpt
+        print("Loading model from: ", args.resume, "finished.")
+    
+    # freeze encoder if args.freeze_encoder is true
+    if args.freeze_encoder:
+        for param in encoder.parameters():
+                param.requires_grad = False
+        print("Encoder frozen.")
+    
+    # synchronize batch norm layers if args.sync_bn is true
+    if args.sync_bn:
+        diffusion_model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(diffusion_model).to(device)
+        encoder = torch.nn.SyncBatchNorm.convert_sync_batchnorm(encoder).to(device)
+        print("Sync BatchNorm layers.")
+    
+    # distributed model
+    if args.distributed:
+        diffusion_model = torch.nn.parallel.DistributedDataParallel(diffusion_model, device_ids=[args.gpu])
+        diffusion_model_without_ddp = diffusion_model.module
+
+        encoder = torch.nn.parallel.DistributedDataParallel(encoder, device_ids=[args.gpu])
+        encoder_without_ddp = encoder.module
+
+    # model info
+    params_to_optimize = []
+    n_parameters, layers = 0, 0
+    for p in diffusion_model.parameters():
+        n_parameters += p.numel()
+        layers += 1
+        if p.requires_grad:
+            params_to_optimize.append(p)
+    print('number of Diffusion params:', n_parameters)
+    print('Diffusion Model Summary: %g layers, %g parameters' % 
+          (layers, n_parameters))
+    
+    n_parameters, layers = 0, 0
+    for p in encoder.parameters():
+        n_parameters += p.numel()
+        layers += 1
+        if p.requires_grad:
+            params_to_optimize.append(p)
+    print('number of Encoder params:', n_parameters)
+    print('Encoder Model Summary: %g layers, %g parameters' %
+          (layers, n_parameters))
+    
+    # learning rate scheduler setting
+    args.lr *= max(1., args.world_size * args.batch_size / 64)
+    optimizer = torch.optim.Adam(params_to_optimize, lr=args.lr, weight_decay=args.weight_decay)
+    lf = lambda x: ((1 + math.cos(x * math.pi / args.epochs)) / 2) * (1 - args.lrf) + args.lrf  # cosine
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
+    scheduler.last_epoch = start_epoch  # do not move
+
+    # start training
+    print("Start training...")
+    output_dir = Path(results_file)
+    best_loss, best_acc = float('inf'), 0.0
+    start_time = time.time()
+    for epoch in range(start_epoch, args.epochs + start_epoch):
+        if args.distributed:
+            sampler_train.set_epoch(epoch)
         
+        # train
+        train_loss_dict = train_one_epoch(encoder=encoder, model=diffusion_model,
+                                          criterion=diffusion_util, data_loader=data_loader_train,
+                                          optimizer=optimizer, epoch=epoch, scaler=scaler,
+                                          device=device)
+        scheduler.step()
+
+        # evaluate
+        test_loss_dict = evaluate(encoder=encoder, model=diffusion_model,
+                                  criterion=diffusion_util, data_loader=data_loader_val,
+                                  device=device, scaler=scaler, repeat=cfg["diffusion_repeat"])
+        
+        # write results
 
 
 if __name__ == '__main__':
