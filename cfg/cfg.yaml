@@ -38,3 +38,5 @@ T2F_num_classes: 8
 diffu_num_trans_layers: 12
 diffu_residual_trans: True
 diffusion_repeat: 20 # number of times to repeat the diffusion process
+diffusion_num_steps: 1000 # number of steps for the diffusion process (Markov chain)
+diffusion_schedule_mode: linear # linear or cosine
