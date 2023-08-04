@@ -151,17 +151,16 @@ def main(args):
     print("Diffusion model generating...")
     variance = VarianceSchedule(num_steps=cfg["diffusion_num_steps"],
                                 mode=cfg["diffusion_schedule_mode"])
-    
+    variance.to(device)
+
     diffusion_model = build_diffusion_model(diffnet="TransformerConcatLinear", cfg=cfg)
+    diffusion_model.to(device)
+
     diffusion_util = Diffusion_utils(var_sched=variance)
+    diffusion_util.to(device)
+
     encoder = build_feature_extractor(cfg=cfg)
-    if args.rank in [-1, 0]:
-        x = torch.randn(args.batch_size, 
-                        args.time_step, 
-                        2, cfg["Temporal_dim"])
-        beta = torch.randn(args.batch_size,)
-        context = torch.randn(args.batch_size, cfg["feature_dim"])
-        tb_writer.add_graph(diffusion_model, (x, beta, context))
+    encoder.to(device)
     
     # load previous model if resume training
     start_epoch = 0
@@ -223,9 +222,16 @@ def main(args):
 
         encoder = torch.nn.parallel.DistributedDataParallel(encoder, device_ids=[args.gpu])
         encoder_without_ddp = encoder.module
-
-        diffusion_util = torch.nn.parallel.DistributedDataParallel(diffusion_util, device_ids=[args.gpu])
-        diffusion_util_without_ddp = diffusion_util.module
+    
+    # add graph to tensorboard
+    if args.rank in [-1, 0]:
+        x = torch.randn((args.batch_size, 
+                        args.time_step, 
+                        2, cfg["Temporal_dim"]), device=device)
+        beta = torch.randn(args.batch_size, device=device)
+        context = torch.randn((args.batch_size, cfg["feature_dim"]), 
+                              device=device)
+        tb_writer.add_graph(diffusion_model, (x, beta, context))
 
     # model info
     params_to_optimize = []
@@ -308,7 +314,7 @@ def main(args):
                     "diffusion_model": diffusion_model_without_ddp.state_dict() if args.distributed 
                                        else diffusion_model.state_dict(),
                     "encoder": encoder_without_ddp.state_dict() if args.distributed else encoder.state_dict(),
-                    "diffusion_util": diffusion_util_without_ddp.state_dict() if args.distributed
+                    "diffusion_util": diffusion_util.state_dict() if args.distributed
                                       else diffusion_util.state_dict(),
                     "optimizer": optimizer.state_dict(),
                     "scaler": scaler.state_dict() if scaler is not None else None,
@@ -322,7 +328,7 @@ def main(args):
                     "diffusion_model": diffusion_model_without_ddp.state_dict() if args.distributed 
                                        else diffusion_model.state_dict(),
                     "encoder": encoder_without_ddp.state_dict() if args.distributed else encoder.state_dict(),
-                    "diffusion_util": diffusion_util_without_ddp.state_dict() if args.distributed
+                    "diffusion_util": diffusion_util.state_dict() if args.distributed
                                       else diffusion_util.state_dict(),
                     "optimizer": optimizer.state_dict(),
                     "scaler": scaler.state_dict() if scaler is not None else None,

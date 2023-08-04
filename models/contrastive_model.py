@@ -511,7 +511,7 @@ class Encoder_Regressor(nn.Module):
 class Feature_Extractor(nn.Module):
     def __init__(self, cfg: dict = None, pos_type: str = "sine", 
                  in_type: str = "1d") -> None:
-        super(Encoder_Regressor, self).__init__()
+        super(Feature_Extractor, self).__init__()
         assert cfg is not None, "cfg should be a dict"
         self.AutoEncoder_cfg = {
             "in_dim": (cfg["num_frames_per_clip"], cfg["Temporal_dim"]),
