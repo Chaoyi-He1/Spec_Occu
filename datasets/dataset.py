@@ -475,6 +475,10 @@ class Diffusion_multi_env(Dataset):
         for i, data_file_path in enumerate(self.data_files):
             print("Loading data from %s ... (%d / %d)" % 
                   (data_file_path, i, len(self.data_files)))
+            
+            if i != 0:
+                continue
+
             with h5py.File(data_file_path, 'r') as f:
                 data = self.h5py_to_dict(f)
             
@@ -507,6 +511,7 @@ class Diffusion_multi_env(Dataset):
             label is the frequency occupancy of the data within the time steps.
         """
         index = index % len(self.label_dict)
+        index = 0
         time_step = np.random.randint(self.data_len[index])
         if self.data_dict is None:
             with h5py.File(self.data_files[index], 'r') as f:

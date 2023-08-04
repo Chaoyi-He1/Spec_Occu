@@ -18,7 +18,8 @@ def train_one_epoch(encoder: torch.nn.Module, model: torch.nn.Module,
     metric_logger.add_meter('lr', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
 
-    for _, (history, future) in enumerate(metric_logger.log_every(data_loader, 10, header)):
+    for _, (history, hist_labels,
+            future, future_labels) in enumerate(metric_logger.log_every(data_loader, 10, header)):
         history = history.to(device)
         future = future.to(device)
 
@@ -74,7 +75,8 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
     metric_logger.add_meter('FDE percentage', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Test:'
 
-    for _, (history, future) in enumerate(metric_logger.log_every(data_loader, 10, header)):
+    for _, (history, hist_labels,
+            future, future_labels) in enumerate(metric_logger.log_every(data_loader, 10, header)):
         history = history.to(device)
         future = future.to(device)
         b, l, d = future.shape
