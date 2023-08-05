@@ -51,9 +51,9 @@ class Diffusion_utils(nn.Module):
         for _ in range(sample):
             batch_size = context.size(0)
             if bestof:
-                x_T = torch.randn([batch_size, num_points, point_dim]).to(context.device)
+                x_T = torch.randn([batch_size, num_points, 2, point_dim]).to(context.device)
             else:
-                x_T = torch.zeros([batch_size, num_points, point_dim]).to(context.device)
+                x_T = torch.zeros([batch_size, num_points, 2, point_dim]).to(context.device)
             traj = {self.var_sched.num_steps: x_T}
             stride = step
 

@@ -79,7 +79,7 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
             future, future_labels) in enumerate(metric_logger.log_every(data_loader, 10, header)):
         history = history.to(device)
         future = future.to(device)
-        b, l, d = future.shape
+        b, l, c, d = future.shape
 
         # Compute the output
         with torch.cuda.amp.autocast(enabled=scaler is not None), torch.no_grad():
