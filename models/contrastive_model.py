@@ -571,13 +571,13 @@ class Feature_Extractor(nn.Module):
         # B is the batch size; L is the sequence length, in_dim is the input temporal dimension
         # output: [B, feature_dim]
 
-        b, l, c, f_d, t_d = inputs.shape
+        b = inputs.shape[0]
         device = inputs.device
         # assert t_d == self.AutoEncoder_cfg["in_dim"], \
         #     "Input temporal dimension should be the same as the in_dim in AutoEncoder"
         # assert c == self.encoder.in_channel, \
         #     "Input channel should be the same as the in_channel in AutoEncoder"
-        encoder_outputs = torch.stack([self.encoder(inputs[i, :, :, :, :])
+        encoder_outputs = torch.stack([self.encoder(inputs[i, ...])
                                        for i in range(b)]).to(device)
         # assert encoder_outputs.shape == (b, l, self.embed_dim), \
         #     "Encoder output shape should be [B, L, Embedding]"

@@ -162,6 +162,15 @@ class TransformerConcatLinear(Module):
         
         self.linear = ConcatSquashLinear(dim_in=context_dim // 2, dim_out=point_dim, 
                                          dim_ctx=context_dim + 3)
+        self.increase_dim_conv = nn.Sequential(nn.Conv2d(in_channels=seq_len, out_channels=seq_len,
+                                                         kernel_size=(2, 1), stride=(1, 1), 
+                                                         padding=(1, 0)),
+                                               nn.Conv2d(in_channels=seq_len, out_channels=seq_len,
+                                                         kernel_size=(3, 3), stride=(1, 1),
+                                                         padding=(1, 1)),
+                                               nn.Conv2d(in_channels=seq_len, out_channels=seq_len,
+                                                         kernel_size=(3, 3), stride=(1, 1),
+                                                         padding=(1, 1)))
         #self.linear = nn.Linear(128,2)
 
     def forward(self, x, beta, context):
@@ -181,8 +190,9 @@ class TransformerConcatLinear(Module):
 
         trans = self.concat3(ctx_emb, trans)
         trans = self.concat4(ctx_emb, trans)
-        return self.linear(ctx_emb, trans)
-
+        trans = self.linear(ctx_emb, trans).unsqueeze(-2)
+        return self.increase_dim_conv(trans)
+    
 
 class TransformerLinear(Module):
     def __init__(self, point_dim, context_dim, tf_layer=4, residual=True, seq_len=32) -> None:

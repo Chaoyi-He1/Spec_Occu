@@ -53,7 +53,7 @@ def get_args_parser():
     parser.add_argument('--lrf', default=0.01, type=float)
     parser.add_argument('--weight_decay', default=0.0, type=float)
     parser.add_argument('--epochs', default=30000, type=int)
-    parser.add_argument('--batch_size', default=5, type=int)
+    parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--num_workers', default=8, type=int)
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
@@ -223,15 +223,15 @@ def main(args):
         encoder = torch.nn.parallel.DistributedDataParallel(encoder, device_ids=[args.gpu])
         encoder_without_ddp = encoder.module
     
-    # add graph to tensorboard
-    if args.rank in [-1, 0]:
-        x = torch.randn((args.batch_size, 
-                        args.time_step, 
-                        2, cfg["Temporal_dim"]), device=device)
-        beta = torch.randn(args.batch_size, device=device)
-        context = torch.randn((args.batch_size, cfg["feature_dim"]), 
-                              device=device)
-        tb_writer.add_graph(diffusion_model, (x, beta, context))
+    # # add graph to tensorboard
+    # if args.rank in [-1, 0]:
+    #     x = torch.randn((args.batch_size, 
+    #                     args.time_step, 
+    #                     2, cfg["Temporal_dim"]), device=device)
+    #     beta = torch.randn(args.batch_size, device=device)
+    #     context = torch.randn((args.batch_size, cfg["feature_dim"]), 
+    #                           device=device)
+    #     tb_writer.add_graph(diffusion_model, (x, beta, context))
 
     # model info
     params_to_optimize = []
@@ -288,7 +288,7 @@ def main(args):
                      **{f'test_{k}': v for k, v in test_loss_dict.items()},
                      'epoch': epoch}
         if args.output_dir and utils.is_main_process():
-            with (results_file).open("a") as f:
+            with (output_dir).open("a") as f:
                 f.write(json.dumps(log_stats) + "\n")
         
         # write tensorboard
