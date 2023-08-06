@@ -5,7 +5,7 @@ Based on the Transforemr Encoder-Decoder model with the following modifications:
 2. The decoder is formed by a series of Tramsformer decoder blocks with num of query = time steps
 """
 
-from typing import Optional
+from typing import Optional, Tuple, List
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
@@ -88,6 +88,60 @@ def calculate_conv2d_padding(stride, kernel_size, d_in, d_out, dilation=1):
 
     padding = (padding_h, padding_w)
     return padding
+
+
+class Conv1d_BN_Relu(nn.Sequential):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1):
+        super(Conv1d_BN_Relu, self).__init__(
+            nn.Conv1d(in_channels, out_channels, kernel_size, stride, padding, dilation),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        return super(Conv1d_BN_Relu, self).forward(x)
+
+
+class Conv2d_BN_Relu(nn.Sequential):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1):
+        super(Conv2d_BN_Relu, self).__init__(
+            nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        return super(Conv2d_BN_Relu, self).forward(x)
+
+
+class ResBlock_2d(nn.Module):
+    def __init__(self, in_channel: int, kernel_size: int = 3, stride: int = 1, 
+                 in_dim: Tuple[int, int] = (256, 1024), dilation: int = 1, 
+                 drop_path_ratio: float = 0.4) -> None:
+        super(ResBlock_2d, self).__init__()
+        pad = calculate_conv2d_padding(stride, kernel_size, in_dim, in_dim, dilation)
+        self.conv1 = Conv2d_BN_Relu(in_channel, in_channel // 2, kernel_size=1)
+        self.conv2 = Conv2d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, 
+                                    padding=pad, stride=stride, dilation=dilation)
+        self.drop_path = DropPath(drop_path_ratio) if drop_path_ratio > 0 else nn.Identity()
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x + self.drop_path(self.conv2(self.conv1(x)))
+
+
+class ResBlock_1d(nn.Module):
+    def __init__(self, in_channel: int, kernel_size: int = 3, stride: int = 1, 
+                 in_dim: int = 1024, dilation: int = 1, 
+                 drop_path_ratio: float = 0.4) -> None:
+        super(ResBlock_1d, self).__init__()
+        pad = calculate_conv1d_padding(stride, kernel_size, in_dim, in_dim, dilation)
+        self.conv1 = Conv1d_BN_Relu(in_channel, in_channel // 2, kernel_size=1)
+        self.conv2 = Conv1d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, 
+                                    padding=pad, stride=stride, dilation=dilation)
+        self.drop_path = DropPath(drop_path_ratio) if drop_path_ratio > 0 else nn.Identity()
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x + self.drop_path(self.conv2(self.conv1(x)))
 
 
 class TransEncoder_Conv1d_Act_block(nn.Module):
@@ -317,7 +371,61 @@ class Transformer_Temp_2_Freq(nn.Module):
 
         pred_cls = torch.einsum("bnd,ndc->bnc", hs, self.classify_head)
         return pred_cls
+    
 
+class Conv1d_Temp_2_Freq(nn.Module):
+    def __init__(self, cfg: dict = None) -> None:
+        super(Conv1d_Temp_2_Freq, self).__init__()
+        assert cfg is not None, "cfg is None"
 
-def build_T2F(cfg: dict = None, pos_type: str = "sine") -> Transformer_Temp_2_Freq:
-    return Transformer_Temp_2_Freq(cfg, pos_type)
+        self.reduce_dim_conv = nn.Conv2d(in_channels=cfg["T2F_encoder_sequence_length"],
+                                         out_channels=cfg["T2F_encoder_sequence_length"],
+                                         kernel_size=(2, 1), stride=(1, 1), padding=(0, 0))
+        self.channel = cfg["T2F_encoder_sequence_length"]
+        self.temp_dim = cfg["T2F_encoder_embed_dim"]
+
+        self.ResNet = nn.ModuleList()
+        res_params = list(zip([4, 4, 6, 6, 4], [7, 7, 9, 9, 11],   # num_blocks, kernel_size
+                              [3, 3, 3, 3, 3], [1, 5, 5, 3, 3]))   # stride, dilation
+        for i, (num_blocks, kernel_size, stride, dilation) in enumerate(res_params):
+            self.ResNet.extend([ResBlock_1d(self.channel, kernel_size, stride, self.temp_dim, dilation)
+                                for _ in range(num_blocks)])
+            if i != len(res_params) - 1:
+                pad = calculate_conv1d_padding(stride, kernel_size, self.temp_dim, self.temp_dim // 2, dilation)
+                self.ResNet.append(Conv1d_BN_Relu(self.channel, self.channel * 2,
+                                                  kernel_size, stride, pad, dilation))
+                self.channel *= 2
+                self.temp_dim //= 2
+        self.ResNet.append(Conv1d_BN_Relu(in_channels=self.channel, 
+                                          out_channels=cfg["T2F_encoder_sequence_length"],
+                                          kernel_size=1, stride=1, padding=0, dilation=1))
+        
+        self.classify_head = nn.Linear(self.temp_dim, cfg["T2F_num_classes"])
+        self._reset_parameters()
+    
+    def _reset_parameters(self):
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_normal_(p)
+    
+    def forward(self, inputs: Tensor) -> Tensor:
+        """
+        Args:
+            inputs: [B, L, 2, T]
+                B: batch size
+                L: T2F_encoder_sequence_length, length of time frames
+                T: T2F_encoder_embed_dim, length of time dimension
+                2: real and imag channels
+        """
+        x = self.reduce_dim_conv(inputs).squeeze(-2)
+        for layer in self.ResNet:
+            x = layer(x)
+        x = self.classify_head(x)
+        return x
+        
+
+def build_T2F(cfg: dict = None, pos_type: str = "sine", 
+              model_type: str = "Conv") -> Transformer_Temp_2_Freq:
+    model = Transformer_Temp_2_Freq(cfg, pos_type) if model_type == "Transformer" \
+            else Conv1d_Temp_2_Freq(cfg)
+    return model

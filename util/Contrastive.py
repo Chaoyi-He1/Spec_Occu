@@ -55,23 +55,23 @@ class ContrastiveLoss(nn.Module):
 
         ##----------------- With or withour grad -----------------##
         with torch.no_grad():
-            b, l, c, f_d, t_d = targets.shape
+            b, l = targets.shape[:2]
             device = targets.device
 
-            assert pred.shape == (l, b, model.module.embed_dim), \
-                "pred shape should be [time_step, B, embed_dim]"
-            assert t_d == model.module.in_dim, \
-                "Input temporal dimension should be the same as the in_dim in AutoEncoder"
-            assert f_d == model.module.frames_per_clip, \
-                "Input channels should be the same as the in_channels in AutoEncoder"
-            assert c == model.module.AutoEncoder_cfg["in_channel"], \
-                "Input channels should be the same as the in_channels in AutoEncoder"
-            assert len(self.weights) == l, "time_step_weights length should be the same as time_step"
+            # assert pred.shape == (l, b, model.module.embed_dim), \
+            #     "pred shape should be [time_step, B, embed_dim]"
+            # assert t_d == model.module.in_dim, \
+            #     "Input temporal dimension should be the same as the in_dim in AutoEncoder"
+            # assert f_d == model.module.frames_per_clip, \
+            #     "Input channels should be the same as the in_channels in AutoEncoder"
+            # assert c == model.module.AutoEncoder_cfg["in_channel"], \
+            #     "Input channels should be the same as the in_channels in AutoEncoder"
+            # assert len(self.weights) == l, "time_step_weights length should be the same as time_step"
 
             # Calculate the true futures (targets) encoded features (embed vectors)
             # encoded_targets: [B, time_step, embed_dim]
 
-            encoded_targets = torch.stack([model.module.encoder(targets[i, :, :, :])
+            encoded_targets = torch.stack([model.module.encoder(targets[i, ...])
                                         for i in range(b) ]).to(device)
             encoded_targets = encoded_targets.permute(1, 0, 2).contiguous()
         ##---------------------------------------------------------##
