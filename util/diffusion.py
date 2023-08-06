@@ -98,11 +98,11 @@ def compute_batch_statistics(predictions, gt_future):
     ADE error: average displacement error
     FDE error: final displacement error
     """
-    r, _, _, _ = predictions.shape
+    r = predictions.shape[0]
     errors = torch.sqrt(((predictions.sum(dim=0) / r - 
-                          gt_future)**2).sum(dim=2))  # (B, N)
+                          gt_future)**2).sum(dim=(-2, -1)))  # (B, N)
     ADE = errors.mean(dim=1)  # (B, )
-    FDE = errors[:, -1]  # (B, )
-    ADE_percents = ADE / torch.sqrt((gt_future**2).sum(dim=2)).mean(dim=1)
-    FDE_percents = FDE / torch.sqrt((gt_future**2).sum(dim=2))[:, -1]
-    return ADE, FDE, ADE_percents, FDE_percents
+    FDE = errors[:, -1].contiguous()  # (B, )
+    ADE_percents = ADE / torch.sqrt((gt_future**2).sum(dim=(-2, -1))).mean(dim=1)
+    FDE_percents = FDE / (torch.sqrt((gt_future**2).sum(dim=(-2, -1)))[:, -1])
+    return ADE, FDE, ADE_percents, FDE_percents.contiguous()

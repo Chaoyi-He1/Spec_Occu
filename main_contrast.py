@@ -61,7 +61,7 @@ def get_args_parser():
     parser.add_argument('--val-path', default='path/val/', help='val dataset path')
     parser.add_argument('--cache-data', default=True, type=bool, help='cache data for faster training')
     parser.add_argument('--train-split', default=0.8, type=float, help='train split')
-    parser.add_argument('--output-dir', default='weights', help='path where to save, empty for no saving')
+    parser.add_argument('--output-dir', default='weights/contrast', help='path where to save, empty for no saving')
 
     # distributed training parameters
     parser.add_argument('--world_size', default=2, type=int, help='number of distributed processes')
@@ -258,7 +258,7 @@ def main(args):
                      'n_parameters': n_parameters,
                     }
         if args.output_dir and utils.is_main_process():
-            with (output_dir / "log.txt").open("a") as f:
+            with (results_file).open("a") as f:
                 f.write(json.dumps(log_stats) + "\n")
         
         # write tensorboard

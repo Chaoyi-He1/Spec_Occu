@@ -49,7 +49,7 @@ def get_args_parser():
     parser.add_argument('--save-best', action='store_true', help="save best model")
 
     # Optimization parameters
-    parser.add_argument('--lr', default=0.0005, type=float)
+    parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--lrf', default=0.01, type=float)
     parser.add_argument('--weight_decay', default=0.0, type=float)
     parser.add_argument('--epochs', default=30000, type=int)

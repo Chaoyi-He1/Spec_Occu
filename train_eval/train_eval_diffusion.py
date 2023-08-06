@@ -8,7 +8,7 @@ from typing import Iterable
 def train_one_epoch(encoder: torch.nn.Module, model: torch.nn.Module, 
                     criterion: Diffusion_utils, data_loader: Iterable, 
                     optimizer: torch.optim.Optimizer, device: torch.device, 
-                    epoch: int, max_norm: float = .1, scaler=None):
+                    epoch: int, max_norm: float = 0, scaler=None):
     
     encoder.train()
     model.train()
@@ -69,10 +69,10 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
     model.eval()
     criterion.eval()
     metric_logger = MetricLogger(delimiter="; ")
-    metric_logger.add_meter('ADE loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    metric_logger.add_meter('FDE loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    metric_logger.add_meter('ADE percentage', SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    metric_logger.add_meter('FDE percentage', SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter('ADE_loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter('FDE_loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter('ADE_percentage', SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter('FDE_percentage', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Test:'
 
     for _, (history, hist_labels,
@@ -84,7 +84,7 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
         # Compute the output
         with torch.cuda.amp.autocast(enabled=scaler is not None), torch.no_grad():
             features = encoder(history)
-            predict = criterion.sample(num_points=l, context=features, sample=repeat, bestof=False, step=1,
+            predict = criterion.sample(num_points=l, context=features, sample=repeat, bestof=False, step=10,
                                        model=model, point_dim=d, flexibility=0.0, ret_traj=False, sampling="ddpm")
         
         ADE, FDE, ADE_percents, FDE_percents = compute_batch_statistics(predict, future)
@@ -95,10 +95,10 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
         FDE_percents_reduced = reduce_loss(FDE_percents)
 
         # Update metric
-        metric_logger.update(loss=ADE_reduced.item())
-        metric_logger.update(loss=FDE_reduced.item())
-        metric_logger.update(loss=ADE_percents_reduced.item())
-        metric_logger.update(loss=FDE_percents_reduced.item())
+        metric_logger.update(ADE_loss=ADE_reduced.mean().item())
+        metric_logger.update(FDE_loss=FDE_reduced.mean().item())
+        metric_logger.update(ADE_percentage=ADE_percents_reduced.mean().item())
+        metric_logger.update(FDE_percentage=FDE_percents_reduced.mean().item())
     
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()

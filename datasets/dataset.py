@@ -178,21 +178,21 @@ class Contrastive_data_multi_env(Dataset):
             # if the data is from h5py file, it means that the data is cached,
             # the dict contains I and Q channel, each channel is a 2D matrix
             # with shape (num_frames, temporal_dim)
-            real = data["data_frame_I"][:51200, :].astype(np.float16)
-            imag = data["data_frame_Q"][:51200, :].astype(np.float16)
+            real = data["data_frame_I"][:51200, :].astype(np.float32)
+            imag = data["data_frame_Q"][:51200, :].astype(np.float32)
             data = np.stack([real, imag], axis=1)
-            data_c = real + 1j * imag
-            data_fft = np.fft.fft(data_c, axis=-1)
-            data_f_real = np.real(data_fft)
-            data_f_imag = np.imag(data_fft)
-            data = np.concatenate([data, 
-                                data_f_real[:, np.newaxis, :], 
-                                data_f_imag[:, np.newaxis, :]], axis=1)
+            # data_c = real + 1j * imag
+            # data_fft = np.fft.fft(data_c, axis=-1)
+            # data_f_real = np.real(data_fft)
+            # data_f_imag = np.imag(data_fft)
+            # data = np.concatenate([data, 
+            #                     data_f_real[:, np.newaxis, :], 
+            #                     data_f_imag[:, np.newaxis, :]], axis=1)
             # data = data[:-(data.shape[0] % self.num_frames_per_clip), :, :]
             if self.in_type == "2d":
-                data = data.reshape(-1, self.num_frames_per_clip, 4, self.temp_dim).\
+                data = data.reshape(-1, self.num_frames_per_clip, 2, self.temp_dim).\
                     transpose(0, 2, 1, 3)
-            data = data.astype(np.float32)
+            # data = data.astype(np.float32)
         elif isinstance(data, np.ndarray):
             # if the data is a numpy array, it means that the data is not cached,
             # the data is a 4D matrix with shape (batch, num_frames, 2, temporal_dim)
@@ -499,7 +499,8 @@ class Diffusion_multi_env(Dataset):
         return data_dict, label_dict, data_len, min_len
     
     def __len__(self):
-        return len(self.label_dict) * 768
+        return len(self.label_dict) * 768 if self.train \
+               else len(self.label_dict) * 10
     
     def __getitem__(self, index):
         """
