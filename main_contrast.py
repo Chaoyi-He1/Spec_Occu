@@ -150,12 +150,18 @@ def main(args):
     model = build_contrastive_model(cfg=cfg, timestep=args.time_step, pos_type=args.positional_embedding)
     model.to(device)
     if args.rank in [-1, 0]:
-        tb_writer.add_graph(model, torch.randn((args.batch_size, 
-                                                cfg["contrast_sequence_length"], 
-                                                cfg["in_channels"], 
-                                                cfg["num_frames_per_clip"],
-                                                cfg["Temporal_dim"]), 
-                                              device=device, dtype=torch.float), use_strict_trace=False)
+        input = torch.randn((args.batch_size, 
+                             cfg["contrast_sequence_length"], 
+                             cfg["in_channels"], 
+                             cfg["num_frames_per_clip"],
+                             cfg["Temporal_dim"]), 
+                             device=device, dtype=torch.float) if cfg["in_type"] == "2d" else \
+                torch.randn((args.batch_size,
+                             cfg["contrast_sequence_length"], 
+                             cfg["in_channels"], 
+                             cfg["Temporal_dim"]), 
+                             device=device, dtype=torch.float)
+        tb_writer.add_graph(model, input)
     
     # load previous model if resume training
     start_epoch = 0
