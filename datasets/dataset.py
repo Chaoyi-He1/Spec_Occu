@@ -222,7 +222,8 @@ class Contrastive_data_multi_env(Dataset):
         data_len = {}
         min_len = np.inf
         for i, data_file_path in tqdm(enumerate(self.data_files)):
-            print("Loading %s data from %s ..." % ("train" if self.train else "test", data_file_path))
+            print("Loading data from %s ... (%d / %d)" % 
+                  (data_file_path, i, len(self.data_files)))
             with h5py.File(data_file_path, 'r') as f:
                 data = self.h5py_to_dict(f)
             if self.cache:
