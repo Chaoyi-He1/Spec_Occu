@@ -80,3 +80,4 @@
 {"train_loss": 171.7026799519857, "train_class_acc": 0.18722223279376823, "train_lr": 9.999475610035764e-05, "test_class_accuracy": 0.1959722337623437, "test_loss": 10.948323353131611, "epoch": 139, "n_parameters": 54785392}
 {"train_loss": 172.02063166300456, "train_class_acc": 0.19305556590358416, "train_lr": 9.999468037851128e-05, "test_class_accuracy": 0.21458334649602573, "test_loss": 7.399355284372965, "epoch": 140, "n_parameters": 54785392}
 {"train_loss": 168.71192830403646, "train_class_acc": 0.20069445470968883, "train_lr": 9.999460411389508e-05, "test_class_accuracy": 0.19069445629914603, "test_loss": 9.43326442639033, "epoch": 141, "n_parameters": 54785392}
+{"train_loss": 161.33334007263184, "train_class_acc": 0.20222223500410716, "train_lr": 9.999452730650944e-05, "test_class_accuracy": 0.19763890008131663, "test_loss": 13.87964612642924, "epoch": 142, "n_parameters": 54785392}
