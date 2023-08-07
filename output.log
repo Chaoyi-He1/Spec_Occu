@@ -2235,3 +2235,6 @@ Epoch: [142]; [24/60]; eta: 0:00:17; loss: 175.338867; class_acc: 0.17; lr: 0.00
 Epoch: [142]; [28/60]; eta: 0:00:15; loss: 183.805176; class_acc: 0.15; lr: 0.000100; time: 0.4268; data: 0.0006; max mem: 11392
 Epoch: [142]; [32/60]; eta: 0:00:13; loss: 147.513885; class_acc: 0.23; lr: 0.000100; time: 0.4258; data: 0.0006; max mem: 11392
 Epoch: [142]; [36/60]; eta: 0:00:11; loss: 153.053955; class_acc: 0.21; lr: 0.000100; time: 0.4256; data: 0.0005; max mem: 11392
+Epoch: [142]; [40/60]; eta: 0:00:09; loss: 182.064957; class_acc: 0.18; lr: 0.000100; time: 0.4261; data: 0.0005; max mem: 11392
+Epoch: [142]; [44/60]; eta: 0:00:07; loss: 135.177155; class_acc: 0.18; lr: 0.000100; time: 0.4270; data: 0.0005; max mem: 11392
+Epoch: [142]; [48/60]; eta: 0:00:05; loss: 177.753372; class_acc: 0.16; lr: 0.000100; time: 0.4259; data: 0.0005; max mem: 11392
