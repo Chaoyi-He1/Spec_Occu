@@ -2238,3 +2238,10 @@ Epoch: [142]; [36/60]; eta: 0:00:11; loss: 153.053955; class_acc: 0.21; lr: 0.00
 Epoch: [142]; [40/60]; eta: 0:00:09; loss: 182.064957; class_acc: 0.18; lr: 0.000100; time: 0.4261; data: 0.0005; max mem: 11392
 Epoch: [142]; [44/60]; eta: 0:00:07; loss: 135.177155; class_acc: 0.18; lr: 0.000100; time: 0.4270; data: 0.0005; max mem: 11392
 Epoch: [142]; [48/60]; eta: 0:00:05; loss: 177.753372; class_acc: 0.16; lr: 0.000100; time: 0.4259; data: 0.0005; max mem: 11392
+Epoch: [142]; [52/60]; eta: 0:00:03; loss: 172.574310; class_acc: 0.18; lr: 0.000100; time: 0.4274; data: 0.0005; max mem: 11392
+Epoch: [142]; [56/60]; eta: 0:00:01; loss: 141.451340; class_acc: 0.23; lr: 0.000100; time: 0.4277; data: 0.0005; max mem: 11392
+Epoch: [142]; [59/60]; eta: 0:00:00; loss: 127.376648; class_acc: 0.20; lr: 0.000100; time: 0.4285; data: 0.0005; max mem: 11392
+Epoch: [142] Total time: 0:00:27 (0.4571 s / it)
+Averaged stats: loss: 127.376648; class_acc: 0.20; lr: 0.000100
+step_0: 0.2050 step_1: 0.1983 step_2: 0.1583 step_3: 0.1967 step_4: 0.1767 step_5: 0.2233 step_6: 0.1850 step_7: 0.1983 step_8: 0.2000 step_9: 0.2383 step_10: 0.2300 step_11: 0.2167
+Test:; [ 0/60]; eta: 0:01:40; class_accuracy: 0.21; loss: 11.107079; time: 1.6693; data: 1.4733; max mem: 11392
