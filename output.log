@@ -2265,3 +2265,9 @@ Epoch: [143]; [40/60]; eta: 0:00:09; loss: 151.103775; class_acc: 0.22; lr: 0.00
 Epoch: [143]; [44/60]; eta: 0:00:07; loss: 175.179504; class_acc: 0.25; lr: 0.000100; time: 0.4250; data: 0.0005; max mem: 11392
 Epoch: [143]; [48/60]; eta: 0:00:05; loss: 177.088669; class_acc: 0.13; lr: 0.000100; time: 0.4253; data: 0.0005; max mem: 11392
 Epoch: [143]; [52/60]; eta: 0:00:03; loss: 176.164856; class_acc: 0.23; lr: 0.000100; time: 0.4252; data: 0.0004; max mem: 11392
+Epoch: [143]; [56/60]; eta: 0:00:01; loss: 153.460541; class_acc: 0.28; lr: 0.000100; time: 0.4281; data: 0.0004; max mem: 11392
+Epoch: [143]; [59/60]; eta: 0:00:00; loss: 186.293518; class_acc: 0.20; lr: 0.000100; time: 0.4285; data: 0.0004; max mem: 11392
+Epoch: [143] Total time: 0:00:27 (0.4594 s / it)
+Averaged stats: loss: 186.293518; class_acc: 0.20; lr: 0.000100
+step_0: 0.1983 step_1: 0.2017 step_2: 0.1967 step_3: 0.1867 step_4: 0.2000 step_5: 0.2067 step_6: 0.2083 step_7: 0.1833 step_8: 0.1933 step_9: 0.2117 step_10: 0.1800 step_11: 0.1750
+Test:; [ 0/60]; eta: 0:01:38; class_accuracy: 0.20; loss: 7.973966; time: 1.6452; data: 1.4511; max mem: 11392
