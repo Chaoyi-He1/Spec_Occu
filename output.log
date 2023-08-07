@@ -3312,3 +3312,5 @@ Averaged stats: loss: 84.811455; class_acc: 0.25; lr: 0.000100
 step_0: 0.2050 step_1: 0.2267 step_2: 0.2000 step_3: 0.2067 step_4: 0.2133 step_5: 0.1967 step_6: 0.1883 step_7: 0.1817 step_8: 0.1883 step_9: 0.2133 step_10: 0.1967 step_11: 0.2150
 Test:; [ 0/60]; eta: 0:01:35; class_accuracy: 0.24; loss: 5.254632; time: 1.5861; data: 1.3336; max mem: 11392
 Test:; [20/60]; eta: 0:00:10; class_accuracy: 0.19; loss: 4.594957; time: 0.1917; data: 0.0005; max mem: 11392
+Test:; [40/60]; eta: 0:00:04; class_accuracy: 0.20; loss: 11.108333; time: 0.1918; data: 0.0005; max mem: 11392
+Test:; [59/60]; eta: 0:00:00; class_accuracy: 0.18; loss: 6.587390; time: 0.1919; data: 0.0005; max mem: 11392
