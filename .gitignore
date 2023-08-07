@@ -9,4 +9,4 @@ util/__pycache__/*
 util/*.pyc
 datasets/__pycache__/*
 datasets/*.pyc
-jpb.slurm
+job.slurm
