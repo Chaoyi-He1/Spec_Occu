@@ -11,4 +11,4 @@ datasets/__pycache__/*
 datasets/*.pyc
 job.slurm
 output.log
-results*
+results*.txt

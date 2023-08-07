@@ -3314,3 +3314,26 @@ Test:; [ 0/60]; eta: 0:01:35; class_accuracy: 0.24; loss: 5.254632; time: 1.5861
 Test:; [20/60]; eta: 0:00:10; class_accuracy: 0.19; loss: 4.594957; time: 0.1917; data: 0.0005; max mem: 11392
 Test:; [40/60]; eta: 0:00:04; class_accuracy: 0.20; loss: 11.108333; time: 0.1918; data: 0.0005; max mem: 11392
 Test:; [59/60]; eta: 0:00:00; class_accuracy: 0.18; loss: 6.587390; time: 0.1919; data: 0.0005; max mem: 11392
+Test: Total time: 0:00:13 (0.2244 s / it)
+Averaged stats: class_accuracy: 0.18; loss: 6.587390
+step_0: 0.2017 step_1: 0.1917 step_2: 0.1700 step_3: 0.2217 step_4: 0.1750 step_5: 0.1867 step_6: 0.2083 step_7: 0.2317 step_8: 0.2333 step_9: 0.1583 step_10: 0.2017 step_11: 0.2283
+Epoch: [184]; [ 0/60]; eta: 0:01:50; loss: 130.063980; class_acc: 0.12; lr: 0.000100; time: 1.8411; data: 1.4132; max mem: 11392
+Epoch: [184]; [ 4/60]; eta: 0:00:39; loss: 135.941772; class_acc: 0.20; lr: 0.000100; time: 0.7086; data: 0.2827; max mem: 11392
+Epoch: [184]; [ 8/60]; eta: 0:00:30; loss: 135.701508; class_acc: 0.18; lr: 0.000100; time: 0.5848; data: 0.1572; max mem: 11392
+Epoch: [184]; [12/60]; eta: 0:00:25; loss: 121.411163; class_acc: 0.21; lr: 0.000100; time: 0.5360; data: 0.1089; max mem: 11392
+Epoch: [184]; [16/60]; eta: 0:00:22; loss: 134.589355; class_acc: 0.21; lr: 0.000100; time: 0.5102; data: 0.0835; max mem: 11392
+Epoch: [184]; [20/60]; eta: 0:00:19; loss: 124.692039; class_acc: 0.23; lr: 0.000100; time: 0.4276; data: 0.0004; max mem: 11392
+Epoch: [184]; [24/60]; eta: 0:00:17; loss: 101.447510; class_acc: 0.17; lr: 0.000100; time: 0.4281; data: 0.0005; max mem: 11392
+Epoch: [184]; [28/60]; eta: 0:00:15; loss: 111.042503; class_acc: 0.16; lr: 0.000100; time: 0.4280; data: 0.0005; max mem: 11392
+Epoch: [184]; [32/60]; eta: 0:00:13; loss: 121.979256; class_acc: 0.19; lr: 0.000100; time: 0.4278; data: 0.0005; max mem: 11392
+Epoch: [184]; [36/60]; eta: 0:00:11; loss: 113.480408; class_acc: 0.21; lr: 0.000100; time: 0.4281; data: 0.0005; max mem: 11392
+Epoch: [184]; [40/60]; eta: 0:00:09; loss: 102.033775; class_acc: 0.20; lr: 0.000100; time: 0.4273; data: 0.0005; max mem: 11392
+Epoch: [184]; [44/60]; eta: 0:00:07; loss: 119.759796; class_acc: 0.22; lr: 0.000100; time: 0.4271; data: 0.0005; max mem: 11392
+Epoch: [184]; [48/60]; eta: 0:00:05; loss: 110.653389; class_acc: 0.17; lr: 0.000100; time: 0.4270; data: 0.0005; max mem: 11392
+Epoch: [184]; [52/60]; eta: 0:00:03; loss: 110.146599; class_acc: 0.19; lr: 0.000100; time: 0.4268; data: 0.0005; max mem: 11392
+Epoch: [184]; [56/60]; eta: 0:00:01; loss: 100.329865; class_acc: 0.20; lr: 0.000100; time: 0.4260; data: 0.0005; max mem: 11392
+Epoch: [184]; [59/60]; eta: 0:00:00; loss: 142.566315; class_acc: 0.22; lr: 0.000100; time: 0.4268; data: 0.0005; max mem: 11392
+Epoch: [184] Total time: 0:00:27 (0.4596 s / it)
+Averaged stats: loss: 142.566315; class_acc: 0.22; lr: 0.000100
+step_0: 0.1867 step_1: 0.2000 step_2: 0.1800 step_3: 0.1817 step_4: 0.1983 step_5: 0.2083 step_6: 0.1767 step_7: 0.1900 step_8: 0.2317 step_9: 0.2233 step_10: 0.2117 step_11: 0.1767
+Test:; [ 0/60]; eta: 0:01:32; class_accuracy: 0.20; loss: 4.321918; time: 1.5493; data: 1.3373; max mem: 11392
