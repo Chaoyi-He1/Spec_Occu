@@ -48,7 +48,7 @@ def get_args_parser():
     parser.add_argument('--save-best', action='store_true', help="save best model")
 
     # Optimization parameters
-    parser.add_argument('--lr', default=0.0005, type=float)
+    parser.add_argument('--lr', default=0.0001, type=float)
     parser.add_argument('--lrf', default=0.01, type=float)
     parser.add_argument('--weight_decay', default=0.0, type=float)
     parser.add_argument('--epochs', default=30000, type=int)
@@ -236,7 +236,7 @@ def main(args):
 
     # start training
     print("Start training...")
-    output_dir = Path(args.output_dir)
+    output_dir = Path(results_file)
     best_loss, best_acc = float('inf'), 0.0
     start_time = time.time()
     for epoch in range(start_epoch, args.epochs + start_epoch):
@@ -264,7 +264,7 @@ def main(args):
                      'n_parameters': n_parameters,
                     }
         if args.output_dir and utils.is_main_process():
-            with (results_file).open("a") as f:
+            with (output_dir).open("a") as f:
                 f.write(json.dumps(log_stats) + "\n")
         
         # write tensorboard

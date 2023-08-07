@@ -224,6 +224,8 @@ class Contrastive_data_multi_env(Dataset):
         for i, data_file_path in tqdm(enumerate(self.data_files)):
             print("Loading data from %s ... (%d / %d)" % 
                   (data_file_path, i, len(self.data_files)))
+            # if i not in [0, 1, 2, 3]:
+            #     continue
             with h5py.File(data_file_path, 'r') as f:
                 data = self.h5py_to_dict(f)
             if self.cache:
@@ -239,7 +241,7 @@ class Contrastive_data_multi_env(Dataset):
         return data_dict, data_len, min_len
 
     def __len__(self):
-        return len(self.data_files)
+        return len(self.data_len)
 
     def __getitem__(self, index):
         """

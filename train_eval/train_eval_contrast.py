@@ -7,7 +7,7 @@ from typing import Iterable
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
-                    device: torch.device, epoch: int, max_norm: float = 0.01,
+                    device: torch.device, epoch: int, max_norm: float = 0.05,
                     scaler=None, steps: int = 12):
     model.train()
     criterion.train()
@@ -18,7 +18,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     metric_logger.add_meter('lr', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
     
-    for i, (past, future, index) in enumerate(metric_logger.log_every(data_loader, 20, header)):
+    for i, (past, future, index) in enumerate(metric_logger.log_every(data_loader, 4, header)):
         past = past.to(device)
         future = future.to(device)
         index = index.to(device)
