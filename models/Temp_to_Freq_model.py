@@ -5,7 +5,7 @@ Based on the Transforemr Encoder-Decoder model with the following modifications:
 2. The decoder is formed by a series of Tramsformer decoder blocks with num of query = time steps
 """
 
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Union
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
@@ -425,7 +425,8 @@ class Conv1d_Temp_2_Freq(nn.Module):
         
 
 def build_T2F(cfg: dict = None, pos_type: str = "sine", 
-              model_type: str = "Conv") -> Transformer_Temp_2_Freq:
+              model_type: str = "Conv") -> \
+            Union[Transformer_Temp_2_Freq, Conv1d_Temp_2_Freq]:
     model = Transformer_Temp_2_Freq(cfg, pos_type) if model_type == "Transformer" \
             else Conv1d_Temp_2_Freq(cfg)
     return model
