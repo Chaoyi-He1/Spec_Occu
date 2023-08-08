@@ -385,8 +385,8 @@ class Conv1d_Temp_2_Freq(nn.Module):
         self.temp_dim = cfg["T2F_encoder_embed_dim"]
 
         self.ResNet = nn.ModuleList()
-        res_params = list(zip([4, 6, 8, 8, 8], [7, 7, 9, 9, 11],   # num_blocks, kernel_size
-                              [3, 3, 3, 3, 3], [1, 3, 5, 3, 3]))   # stride, dilation
+        res_params = list(zip([4, 8, 8, 8, 8], [3, 7, 9, 9, 11],   # num_blocks, kernel_size
+                              [1, 3, 3, 3, 3], [1, 3, 5, 3, 3]))   # stride, dilation
         for i, (num_blocks, kernel_size, stride, dilation) in enumerate(res_params):
             self.ResNet.extend([ResBlock_1d(self.channel, kernel_size, stride, self.temp_dim, dilation)
                                 for _ in range(num_blocks)])
