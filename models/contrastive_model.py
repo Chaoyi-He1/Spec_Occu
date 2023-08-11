@@ -275,7 +275,7 @@ class Conv1d_AutoEncoder(nn.Module):
                 self.channel *= 2
                 self.temp_dim //= 2
         
-        self.avgpool = nn.AdaptiveAvgPool1d(1)
+        self.reduce_temp_dim = nn.Linear(self.temp_dim, 1)
         self._reset_parameters()
     
     def _reset_parameters(self):
@@ -294,7 +294,7 @@ class Conv1d_AutoEncoder(nn.Module):
         x = self.conv2(x)
         for block in self.ResNet:
             x = block(x)
-        x = self.avgpool(x)
+        x = self.reduce_temp_dim(x)
         return x.squeeze(-1)
 
 class TransEncoder_Conv1d_Act_block(nn.Module):

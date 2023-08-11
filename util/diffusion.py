@@ -33,7 +33,7 @@ class Diffusion_utils(nn.Module):
 
         e_rand = torch.randn_like(x_0).cuda()  # (B, N, c, d)
 
-        e_theta = model(c0 * x_0 + c1 * e_rand, beta=beta, context=context)
+        e_theta = model(c0 * x_0 + c1 * e_rand, beta=beta, context=context, t=t)
         loss = F.mse_loss(e_theta, e_rand, reduction='mean')
         return loss
 
@@ -70,7 +70,7 @@ class Diffusion_utils(nn.Module):
 
                 x_t = traj[t]
                 beta = self.var_sched.betas[[t] * batch_size]
-                e_theta = model(x_t, beta=beta, context=context)
+                e_theta = model(x_t, beta=beta, context=context, t=t)
                 if sampling == "ddpm":
                     x_next = c0 * (x_t - c1 * e_theta) + sigma * z
                 elif sampling == "ddim":

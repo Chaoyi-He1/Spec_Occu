@@ -6,6 +6,7 @@ import torch.nn as nn
 from .common import *
 from .positional_embedding import *
 from .transformer import *
+from typing import Optional, Tuple, Union, List, Dict
 
 
 class VarianceSchedule(Module):
@@ -77,8 +78,137 @@ class VarianceSchedule(Module):
         return sigmas
 
 
-class TrajNet(Module):
+def calculate_conv1d_padding(stride, kernel_size, d_in, d_out, dilation=1):
+    """
+    Calculate the padding value for a 1D convolutional layer.
 
+    Args:
+        stride (int): Stride value for the convolutional layer.
+        kernel_size (int): Kernel size for the convolutional layer.
+        d_in (int): Input dimension of the feature map.
+        d_out (int): Output dimension of the feature map.
+        dilation (int, optional): Dilation value for the convolutional layer.
+                                  Default is 1.
+
+    Returns:
+        int: Padding value for the convolutional layer.
+
+    """
+    padding = math.ceil((stride * (d_out - 1) - 
+                         d_in + (dilation * 
+                                 (kernel_size - 1)) + 1) / 2)
+    assert padding >= 0, "Padding value must be greater than or equal to 0."
+
+    return padding
+
+
+class Conv1d_BN_Relu(nn.Sequential):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1):
+        super(Conv1d_BN_Relu, self).__init__(
+            nn.Conv1d(in_channels, out_channels, kernel_size, stride, padding, dilation),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        return super(Conv1d_BN_Relu, self).forward(x)
+
+
+class ResBlock_1d(nn.Module):
+    def __init__(self, in_channel: int, kernel_size: int = 3, stride: int = 1, 
+                 in_dim: int = 1024, dilation: int = 1, 
+                 drop_path_ratio: float = 0.4) -> None:
+        super(ResBlock_1d, self).__init__()
+        pad = calculate_conv1d_padding(stride, kernel_size, in_dim, in_dim, dilation)
+        self.conv1 = Conv1d_BN_Relu(in_channel, in_channel // 2, kernel_size=1)
+        self.conv2 = Conv1d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, 
+                                    padding=pad, stride=stride, dilation=dilation)
+        self.drop_path = DropPath(drop_path_ratio) if drop_path_ratio > 0 else nn.Identity()
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x + self.drop_path(self.conv2(self.conv1(x)))
+
+
+class ResBlock_1d_with_Attention(nn.Module):
+    def __init__(self, in_channel: int, kernel_size: int = 3, stride: int = 1, 
+                 in_dim: int = 1024, dilation: int = 1, 
+                 drop_path_ratio: float = 0.4) -> None:
+        super(ResBlock_1d_with_Attention, self).__init__()
+        pad = calculate_conv1d_padding(stride, kernel_size, in_dim, in_dim, dilation)
+        self.conv1 = Conv1d_BN_Relu(in_channel, in_channel // 2, kernel_size=1)
+        self.conv2 = Conv1d_BN_Relu(in_channel // 2, in_channel, kernel_size=kernel_size, 
+                                    padding=pad, stride=stride, dilation=dilation)
+        self.atten = nn.Conv1d(in_channel, in_channel, kernel_size=1, stride=1, padding=0)
+        self.drop_path = DropPath(drop_path_ratio) if drop_path_ratio > 0 else nn.Identity()
+
+    def forward(self, x: Tensor) -> Tensor:
+        conv_out = self.conv2(self.conv1(x))
+        atten_out = F.sigmoid(self.atten(x))
+        return x * atten_out + self.drop_path(conv_out)
+
+
+class Conv1d_encoder(nn.Module):
+    def __init__(self, cfg: dict = None) -> None:
+        super(Conv1d_encoder, self).__init__()
+        assert cfg is not None, "cfg is None"
+
+        self.channel = cfg["T2F_encoder_sequence_length"]
+        self.temp_dim = cfg["T2F_encoder_embed_dim"]
+
+        self.ResNet = nn.ModuleList()
+        self.step_embedding = nn.ModuleList()
+        self.context_embedding = nn.ModuleList()
+        
+        res_params = list(zip([4, 4, 8, 8, 6], [3, 7, 9, 9, 11],   # num_blocks, kernel_size
+                              [1, 3, 3, 3, 3], [1, 3, 5, 3, 3]))   # stride, dilation
+        for i, (num_blocks, kernel_size, stride, dilation) in enumerate(res_params):
+            self.ResNet.extend([ResBlock_1d_with_Attention(self.channel, kernel_size, 
+                                                           stride, self.temp_dim, dilation)
+                                for _ in range(num_blocks)])
+            self.step_embedding.append(nn.Embedding(cfg["diffusion_num_steps"], self.temp_dim))
+            self.context_embedding.append(nn.Linear(cfg["feature_dim"], self.temp_dim))
+            
+            if i != len(res_params) - 1:
+                pad = calculate_conv1d_padding(stride, kernel_size, self.temp_dim, self.temp_dim // 2, dilation)
+                self.ResNet.append(Conv1d_BN_Relu(self.channel, self.channel * 2,
+                                                  kernel_size, stride, pad, dilation))
+                self.channel *= 2
+                self.temp_dim //= 2
+                
+        self.back_proj = nn.Conv1d(in_channels=self.channel, 
+                                   out_channels=cfg["T2F_encoder_sequence_length"],
+                                   kernel_size=1, stride=1, padding=0, dilation=1)
+        
+        self._reset_parameters()
+    
+    def _reset_parameters(self):
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_normal_(p)
+    
+    def forward(self, inputs: Tensor, context: Tensor, t) -> Tensor:
+        """
+        Args:
+            inputs: [B, L, T]
+                B: batch size
+                L: sequence_length, length of time frames
+                T: embed_dim, length of time dimension
+        """
+        x = inputs
+        for (conv_layer, 
+             step_embed_layer, 
+             context_embed_layer) in zip(self.ResNet, 
+                                         self.step_embedding, 
+                                         self.context_embedding):
+            step_embed = step_embed_layer(t)
+            context_embed = context_embed_layer(context)
+            x += (step_embed + context_embed)
+            x = conv_layer(x)
+        x = self.back_proj(x)
+        return x
+    
+
+class TrajNet(Module):
     def __init__(self, point_dim: int = 1024, time_embed_dim: int = 256,
                  context_dim: int = 256, seq_len: int = 32,
                  residual: bool = True):
@@ -134,12 +264,15 @@ class TrajNet(Module):
 
 
 class TransformerConcatLinear(Module):
-    def __init__(self, point_dim, context_dim, tf_layer=4, residual=True, seq_len=32):
+    def __init__(self, cfg, point_dim, context_dim, 
+                 tf_layer=4, residual=True, seq_len=32):
         super().__init__()
         self.residual = residual
         self.reduce_dim_conv = nn.Conv2d(in_channels=seq_len,
                                          out_channels=seq_len,
                                          kernel_size=(2, 1), stride=(1, 1), padding=(0, 0))
+        self.conv_1d_encoder = Conv1d_encoder(cfg=cfg)
+        
         self.pos_emb = PositionEmbeddingSine(2 * context_dim, normalize=True)
 
         self.concat1 = ConcatSquashLinear(dim_in=point_dim, dim_out=2 * context_dim, 
@@ -173,9 +306,10 @@ class TransformerConcatLinear(Module):
                                                          padding=(1, 1)))
         #self.linear = nn.Linear(128,2)
 
-    def forward(self, x, beta, context):
+    def forward(self, x, beta, context, t):
         batch_size = x.size(0)
         x = self.reduce_dim_conv(x).squeeze(-2)
+        x = self.conv_1d_encoder(x, context, t)
         beta = beta.view(batch_size, 1, 1)          # (B, 1, 1)
         context = context.view(batch_size, 1, -1)   # (B, 1, F)
 
@@ -195,12 +329,15 @@ class TransformerConcatLinear(Module):
     
 
 class TransformerLinear(Module):
-    def __init__(self, point_dim, context_dim, tf_layer=4, residual=True, seq_len=32) -> None:
+    def __init__(self, cfg, point_dim, context_dim, 
+                 tf_layer=4, residual=True, seq_len=32) -> None:
         super().__init__()
         self.residual = residual
         self.reduce_dim_conv = nn.Conv2d(in_channels=seq_len,
                                          out_channels=seq_len,
                                          kernel_size=(2, 1), stride=(1, 1), padding=(0, 0))
+        self.conv_1d_encoder = Conv1d_encoder(cfg=cfg)
+        
         self.pos_emb = PositionEmbeddingSine(context_dim, normalize=True)
 
         self.y_up = nn.Linear(point_dim, 2048)
@@ -218,9 +355,10 @@ class TransformerLinear(Module):
 
         self.linear = nn.Linear(2048, point_dim)
      
-    def forward(self, x, beta, context):
+    def forward(self, x, beta, context, t):
         batch_size = x.size(0)
         x = self.reduce_dim_conv(x).squeeze(-2)
+        x = self.conv_1d_encoder(x, context, t)
         beta = beta.view(batch_size, 1, 1)          # (B, 1, 1)
         context = context.view(batch_size, 1, -1)   # (B, 1, F)
 
@@ -239,12 +377,14 @@ class TransformerLinear(Module):
 
 
 class LinearDecoder(Module):
-    def __init__(self, seq_len=32):
+    def __init__(self, seq_len=32, cfg: dict = None) -> None:
             super().__init__()
             self.act = F.leaky_relu
             self.reduce_dim_conv = nn.Conv2d(in_channels=seq_len,
                                          out_channels=seq_len,
                                          kernel_size=(2, 1), stride=(1, 1), padding=(0, 0))
+            self.conv_1d_encoder = Conv1d_encoder(cfg=cfg)
+            
             self.layers = ModuleList([
                 #nn.Linear(2, 64),
                 nn.Linear(32, 64),
@@ -257,8 +397,9 @@ class LinearDecoder(Module):
                 #nn.Linear(2, 64),
                 #nn.Linear(2, 64),
             ])
-    def forward(self, code):
+    def forward(self, code, context, t):
         code = self.reduce_dim_conv(code).squeeze(-2)
+        code = self.conv_1d_encoder(code, context, t)
         out = code
         for i, layer in enumerate(self.layers):
             out = layer(out)
@@ -274,13 +415,14 @@ def build_diffusion_model(diffnet: str = "TransformerConcatLinear",
         "context_dim": cfg["feature_dim"],
         "tf_layer": cfg["diffu_num_trans_layers"],
         "residual": cfg["diffu_residual_trans"],
-        "seq_len": cfg["T2F_encoder_sequence_length"]
+        "seq_len": cfg["T2F_encoder_sequence_length"],
+        "cfg": cfg
     }
     if diffnet == "TransformerConcatLinear":
         return TransformerConcatLinear(**transformer_param)
     elif diffnet == "TransformerLinear":
         return TransformerLinear(**transformer_param)
     elif diffnet == "LinearDecoder":
-        return LinearDecoder(cfg["T2F_encoder_sequence_length"])
+        return LinearDecoder(cfg["T2F_encoder_sequence_length"], cfg)
     else:
         raise NotImplementedError
