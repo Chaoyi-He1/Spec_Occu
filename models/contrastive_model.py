@@ -280,7 +280,7 @@ class Conv1d_AutoEncoder(nn.Module):
         self.reduce_temp_dim = nn.Sequential(
             nn.Linear(self.temp_dim, 256),
             nn.Linear(256, 128),
-            nn.Linear(128, 1),
+            nn.Linear(128, self.channel),
         )
         self._reset_parameters()
     
