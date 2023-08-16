@@ -259,7 +259,7 @@ class Conv1d_AutoEncoder(nn.Module):
         self.temp_dim //= 2
 
         self.ResNet = nn.ModuleList()
-        res_params = list(zip([4, 4, 6, 6, 4], [7, 7, 9, 9, 11],   # num_blocks, kernel_size
+        res_params = list(zip([4, 6, 8, 8, 4], [7, 7, 9, 9, 11],   # num_blocks, kernel_size
                               [3, 3, 3, 3, 3], [1, 5, 5, 3, 3]))   # stride, dilation
         # final channels = 512; final temp_dim = in_dim // (2^5) = in_dim // 32
         for i, (num_blocks, kernel_size, stride, dilation) in enumerate(res_params):
@@ -274,6 +274,8 @@ class Conv1d_AutoEncoder(nn.Module):
                                                   kernel_size, stride, pad, dilation))
                 self.channel *= 2
                 self.temp_dim //= 2
+        
+        self.ResNet.append(nn.Conv1d(in_channels=self.channel, out_channels=1, kernel_size=1))
         
         self.reduce_temp_dim = nn.Sequential(
             nn.Linear(self.temp_dim, 256),
@@ -298,8 +300,9 @@ class Conv1d_AutoEncoder(nn.Module):
         x = self.conv2(x)
         for block in self.ResNet:
             x = block(x)
+        x = x.squeeze(-2)
         x = self.reduce_temp_dim(x)
-        return x.squeeze(-1)
+        return x
 
 class TransEncoder_Conv1d_Act_block(nn.Module):
     def __init__(self, num_layers=4, d_model=512, nhead=8, dim_feedforward=512, dropout=0.1,
