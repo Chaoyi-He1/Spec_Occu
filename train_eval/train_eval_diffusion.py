@@ -8,7 +8,7 @@ from typing import Iterable
 def train_one_epoch(encoder: torch.nn.Module, model: torch.nn.Module, 
                     criterion: Diffusion_utils, data_loader: Iterable, 
                     optimizer: torch.optim.Optimizer, device: torch.device, 
-                    epoch: int, max_norm: float = 0, scaler=None):
+                    epoch: int, max_norm: float = 0.1, scaler=None):
     
     encoder.train()
     model.train()
@@ -20,7 +20,7 @@ def train_one_epoch(encoder: torch.nn.Module, model: torch.nn.Module,
     
     for _, (history, hist_labels,
             future, future_labels) in enumerate(metric_logger.log_every(data_loader, 10, header)):
-        torch.autograd.set_detect_anomaly(True)
+        # torch.autograd.set_detect_anomaly(True)
         history = history.to(device)
         future = future.to(device)
 
@@ -50,7 +50,8 @@ def train_one_epoch(encoder: torch.nn.Module, model: torch.nn.Module,
             scaler.update()
         else:
             optimizer.step()
-        
+            
+        # torch.autograd.set_detect_anomaly(False)
         # Update metric
         metric_logger.update(loss=BCELoss_reduced.item())
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])

@@ -200,7 +200,7 @@ class Conv1d_encoder(nn.Module):
                 T: embed_dim, length of time dimension
         """
         x = inputs
-        t = torch.tensor(t, requires_grad=False).to(inputs.device)
+        t = torch.tensor(t, requires_grad=False).to(inputs.device) - 1
         idx = 0
         # b, l, t_dim = inputs.shape
         for i, conv_layer in enumerate(self.ResNet):

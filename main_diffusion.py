@@ -50,7 +50,7 @@ def get_args_parser():
     parser.add_argument('--save-best', action='store_true', help="save best model")
 
     # Optimization parameters
-    parser.add_argument('--lr', default=0.001, type=float)
+    parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--lrf', default=0.01, type=float)
     parser.add_argument('--weight_decay', default=0.0, type=float)
     parser.add_argument('--epochs', default=30000, type=int)
@@ -273,7 +273,7 @@ def main(args):
     
     # learning rate scheduler setting
     args.lr *= max(1., args.world_size * args.batch_size / 64)
-    optimizer = torch.optim.Adam(params_to_optimize, lr=args.lr, weight_decay=args.weight_decay)
+    optimizer = torch.optim.AdamW(params_to_optimize, lr=args.lr, weight_decay=args.weight_decay)
     lf = lambda x: ((1 + math.cos(x * math.pi / args.epochs)) / 2) * (1 - args.lrf) + args.lrf  # cosine
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     scheduler.last_epoch = start_epoch  # do not move
