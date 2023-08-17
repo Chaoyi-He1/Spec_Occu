@@ -159,25 +159,30 @@ class Conv1d_encoder(nn.Module):
         self.step_embedding = nn.ModuleList()
         self.context_embedding = nn.ModuleList()
         
-        res_params = list(zip([4, 4, 8, 8, 6], [5, 7, 9, 9, 11],   # num_blocks, kernel_size
-                              [3, 3, 5, 3, 3], [1, 3, 5, 3, 3]))   # stride, dilation
-        for i, (num_blocks, kernel_size, stride, dilation) in enumerate(res_params):
+        self.res_params = list(zip([4, 4, 8, 8, 6], [5, 7, 9, 9, 11],   # num_blocks, kernel_size
+                                   [3, 3, 5, 3, 3], [1, 3, 5, 3, 3]))   # stride, dilation
+        self.cum_blocks = np.cumsum([4, 4, 8, 8, 6]) + np.arange(5)
+        for i, (num_blocks, kernel_size, stride, dilation) in enumerate(self.res_params):
             self.ResNet.extend([ResBlock_1d_with_Attention(self.channel, kernel_size, 
                                                            stride, self.temp_dim, dilation)
                                 for _ in range(num_blocks)])
             self.step_embedding.append(nn.Embedding(cfg["diffusion_num_steps"], self.temp_dim))
             self.context_embedding.append(nn.Linear(cfg["feature_dim"], self.temp_dim))
             
-            if i != len(res_params) - 1:
+            if i != len(self.res_params) - 1:
                 pad = calculate_conv1d_padding(stride, kernel_size, self.temp_dim, self.temp_dim // 2, dilation)
                 self.ResNet.append(Conv1d_BN_Relu(self.channel, self.channel * 2,
                                                   kernel_size, stride, pad, dilation))
                 self.channel *= 2
                 self.temp_dim //= 2
                 
-        self.back_proj = nn.Conv1d(in_channels=self.channel, 
-                                   out_channels=cfg["T2F_encoder_sequence_length"],
-                                   kernel_size=1, stride=1, padding=0, dilation=1)
+        self.channel_back_proj = nn.Conv1d(in_channels=self.channel, 
+                                           out_channels=cfg["T2F_encoder_sequence_length"],
+                                           kernel_size=1, stride=1, padding=0, dilation=1)
+        # self.temp_proj_step_embed = nn.Embedding(cfg["diffusion_num_steps"], cfg["feature_dim"])
+        self.temp_back_proj = ConcatSquashLinear(dim_in=self.temp_dim, 
+                                                 dim_out=cfg["T2F_encoder_embed_dim"],
+                                                 dim_ctx=cfg["feature_dim"] + 3)
         
         self._reset_parameters()
     
@@ -186,7 +191,7 @@ class Conv1d_encoder(nn.Module):
             if p.dim() > 1:
                 nn.init.xavier_normal_(p)
     
-    def forward(self, inputs: Tensor, context: Tensor, t) -> Tensor:
+    def forward(self, inputs: Tensor, context: Tensor, t, beta) -> Tensor:
         """
         Args:
             inputs: [B, L, T]
@@ -195,16 +200,20 @@ class Conv1d_encoder(nn.Module):
                 T: embed_dim, length of time dimension
         """
         x = inputs
-        for (conv_layer, 
-             step_embed_layer, 
-             context_embed_layer) in zip(self.ResNet, 
-                                         self.step_embedding, 
-                                         self.context_embedding):
-            step_embed = step_embed_layer(t)
-            context_embed = context_embed_layer(context)
-            x += (step_embed + context_embed)
+        t = torch.tensor(t, requires_grad=False).to(inputs.device)
+        idx = 0
+        # b, l, t_dim = inputs.shape
+        for i, conv_layer in enumerate(self.ResNet):
+            step_embed = self.step_embedding[idx](t)
+            context_embed = self.context_embedding[idx](context)
+            x = x + (step_embed + context_embed).unsqueeze(1)
             x = conv_layer(x)
-        x = self.back_proj(x)
+            idx += 1 if i == self.cum_blocks[idx] else 0
+        x = self.channel_back_proj(x)
+        time_emb = torch.stack([beta, torch.sin(beta), 
+                                torch.cos(beta)], dim=1).unsqueeze(1)
+        ctx_emb = torch.cat([time_emb, context.unsqueeze(1)], dim=-1)
+        x = self.temp_back_proj(ctx=ctx_emb, x=x)
         return x
     
 
@@ -309,7 +318,7 @@ class TransformerConcatLinear(Module):
     def forward(self, x, beta, context, t):
         batch_size = x.size(0)
         x = self.reduce_dim_conv(x).squeeze(-2)
-        x = self.conv_1d_encoder(x, context, t)
+        x = self.conv_1d_encoder(x, context, t, beta)
         beta = beta.view(batch_size, 1, 1)          # (B, 1, 1)
         context = context.view(batch_size, 1, -1)   # (B, 1, F)
 

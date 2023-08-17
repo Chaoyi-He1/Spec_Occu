@@ -54,7 +54,7 @@ def get_args_parser():
     parser.add_argument('--lrf', default=0.01, type=float)
     parser.add_argument('--weight_decay', default=0.0, type=float)
     parser.add_argument('--epochs', default=30000, type=int)
-    parser.add_argument('--batch_size', default=16, type=int)
+    parser.add_argument('--batch_size', default=8, type=int)
     parser.add_argument('--num_workers', default=8, type=int)
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
@@ -208,9 +208,10 @@ def main(args):
         print("Loading encoder from: ", args.encoder_path)
         ckpt = torch.load(args.encoder_path, map_location='cpu')
         try:
-            ckpt["encoder"] = {k: v for k, v in ckpt["encoder"].items()
-                               if encoder.state_dict()[k].numel() == v.numel()}
-            encoder.load_state_dict(ckpt["encoder"], strict=False)
+            ckpt["model"] = {k: ckpt["model"][k] 
+                               for k, v in encoder.state_dict().items()
+                               if ckpt["model"][k].numel() == v.numel()}
+            encoder.load_state_dict(ckpt["model"], strict=False)
         except KeyError as e:
             s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
                 % (args.weights, args.hyp, args.weights)

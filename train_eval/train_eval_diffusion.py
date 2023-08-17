@@ -17,9 +17,10 @@ def train_one_epoch(encoder: torch.nn.Module, model: torch.nn.Module,
     metric_logger.add_meter('loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     metric_logger.add_meter('lr', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
-
+    
     for _, (history, hist_labels,
             future, future_labels) in enumerate(metric_logger.log_every(data_loader, 10, header)):
+        torch.autograd.set_detect_anomaly(True)
         history = history.to(device)
         future = future.to(device)
 
