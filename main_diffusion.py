@@ -40,6 +40,7 @@ def get_args_parser():
 
     # Model parameters
     parser.add_argument('--resume', type=str, default='', help="initial weights path")  # weights/model_940.pth
+    parser.add_argument('--encoder-path', type=str, default='weights/contrast/model_1063.pth', help="encoder path")
     parser.add_argument('--time-step', type=int, default=32, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
     parser.add_argument('--positional-embedding', default='learned', choices=('sine', 'learned'),
@@ -202,6 +203,20 @@ def main(args):
             scaler.load_state_dict(ckpt["scaler"])
         del ckpt
         print("Loading model from: ", args.resume, "finished.")
+    
+    if args.encoder_path.endswith(".pth"):
+        print("Loading encoder from: ", args.encoder_path)
+        ckpt = torch.load(args.encoder_path, map_location='cpu')
+        try:
+            ckpt["encoder"] = {k: v for k, v in ckpt["encoder"].items()
+                               if encoder.state_dict()[k].numel() == v.numel()}
+            encoder.load_state_dict(ckpt["encoder"], strict=False)
+        except KeyError as e:
+            s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
+                % (args.weights, args.hyp, args.weights)
+            raise KeyError(s) from e
+        del ckpt
+        print("Loading encoder from: ", args.encoder_path, "finished.")
     
     # freeze encoder if args.freeze_encoder is true
     if args.freeze_encoder:

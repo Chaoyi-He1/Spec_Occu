@@ -159,8 +159,8 @@ class Conv1d_encoder(nn.Module):
         self.step_embedding = nn.ModuleList()
         self.context_embedding = nn.ModuleList()
         
-        res_params = list(zip([4, 4, 8, 8, 6], [3, 7, 9, 9, 11],   # num_blocks, kernel_size
-                              [1, 3, 3, 3, 3], [1, 3, 5, 3, 3]))   # stride, dilation
+        res_params = list(zip([4, 4, 8, 8, 6], [5, 7, 9, 9, 11],   # num_blocks, kernel_size
+                              [3, 3, 5, 3, 3], [1, 3, 5, 3, 3]))   # stride, dilation
         for i, (num_blocks, kernel_size, stride, dilation) in enumerate(res_params):
             self.ResNet.extend([ResBlock_1d_with_Attention(self.channel, kernel_size, 
                                                            stride, self.temp_dim, dilation)
