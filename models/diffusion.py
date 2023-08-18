@@ -282,7 +282,7 @@ class TransformerConcatLinear(Module):
                                          kernel_size=(2, 1), stride=(1, 1), padding=(0, 0))
         self.conv_1d_encoder = Conv1d_encoder(cfg=cfg)
         
-        self.pos_emb = PositionEmbeddingSine(2 * context_dim, normalize=True)
+        self.pos_emb = PositionEmbeddingSine(embed_dim, normalize=True)
 
         self.concat1 = ConcatSquashLinear(dim_in=point_dim, dim_out=embed_dim, 
                                           dim_ctx=context_dim + 3)
@@ -301,10 +301,10 @@ class TransformerConcatLinear(Module):
 
         self.concat3 = ConcatSquashLinear(dim_in=embed_dim, dim_out=embed_dim,
                                           dim_ctx=context_dim + 3)
-        self.concat4 = ConcatSquashLinear(dim_in=context_dim, dim_out=context_dim * 2,
+        self.concat4 = ConcatSquashLinear(dim_in=embed_dim, dim_out=embed_dim * 2,
                                           dim_ctx=context_dim + 3)
         
-        self.linear = ConcatSquashLinear(dim_in=context_dim * 2, dim_out=point_dim, 
+        self.linear = ConcatSquashLinear(dim_in=embed_dim * 2, dim_out=point_dim, 
                                          dim_ctx=context_dim + 3)
         
         self.increase_dim_conv = nn.Sequential(nn.Conv2d(in_channels=seq_len, out_channels=seq_len,
@@ -332,7 +332,7 @@ class TransformerConcatLinear(Module):
         # final_emb = x.permute(1,0,2).contiguous()
         x += self.pos_emb(x)
 
-        trans = self.transformer_encoder(x)
+        trans = self.transformer_encoder(x, ctx_emb)  # b * L+1 * 128
 
         trans = self.concat3(ctx_emb, trans)
         trans = self.concat4(ctx_emb, trans)
@@ -428,7 +428,7 @@ def build_diffusion_model(diffnet: str = "TransformerConcatLinear",
         "tf_layer": cfg["diffu_num_trans_layers"],
         "residual": cfg["diffu_residual_trans"],
         "seq_len": cfg["T2F_encoder_sequence_length"],
-        "embed_dim": cfg["diffu_embed_dim"], 
+        "embed_dim": cfg["diffusion_embed_dim"], 
         "cfg": cfg
     }
     if diffnet == "TransformerConcatLinear":
