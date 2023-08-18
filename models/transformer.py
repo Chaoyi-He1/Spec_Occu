@@ -106,6 +106,75 @@ class Transformer_Encoder_Layer(nn.Module):
                 pos: Optional[Tensor] = None):
         return self.forward_pre(src, src_mask, src_key_padding_mask, pos) if self.normalize_before else \
             self.forward_post(src, src_mask, src_key_padding_mask, pos)
+
+
+class ConcatTransformer_Encoder_Layer(nn.Module):
+    def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, ctx_dim=128,
+                 drop_path = 0.4, activation="relu", normalize_before=True) -> None:
+        super(ConcatTransformer_Encoder_Layer, self).__init__()
+
+        self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout, batch_first=True)
+        
+        self._hyper_bias = nn.Linear(ctx_dim, d_model, bias=False)
+        self._hyper_gate = nn.Linear(ctx_dim, d_model)
+
+        self.linear1 = nn.Linear(d_model, dim_feedforward)
+        self.dropout = nn.Dropout(dropout)
+        self.linear2 = nn.Linear(dim_feedforward, d_model)
+
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.dropout1 = nn.Dropout(dropout)
+        self.dropout2 = nn.Dropout(dropout)
+        self.droppath1 = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.droppath2 = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+
+        self.normalize_before = normalize_before
+        self.activation = _get_activation_fn(activation)
+
+    def with_pos_embed(self, tensor, pos: Optional[Tensor]):
+        return tensor if pos is None else tensor + pos 
+    
+    def forward_post(self,
+                     src,
+                     src_mask: Optional[Tensor] = None,
+                     src_key_padding_mask: Optional[Tensor] = None,
+                     pos: Optional[Tensor] = None):
+        q = k = self.with_pos_embed(src, pos)
+        src2 = self.self_attn(q, k, value=src, attn_mask=src_mask,
+                              key_padding_mask=src_key_padding_mask)[0]
+        src = src + self.droppath1(self.dropout1(src2))
+        src = self.norm1(src)
+        src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
+        src = src + self.droppath2(self.dropout2(src2))
+        src = self.norm2(src)
+        return src
+
+    def forward_pre(self,
+                    src,
+                    src_mask: Optional[Tensor] = None,
+                    src_key_padding_mask: Optional[Tensor] = None,
+                    pos: Optional[Tensor] = None):
+        src2 = self.norm1(src)
+        q = k = self.with_pos_embed(src2, pos)
+        src2 = self.self_attn(q, k, value=src2, attn_mask=src_mask,
+                              key_padding_mask=src_key_padding_mask)[0]
+        src = src + self.droppath1(self.dropout1(src2))
+        src2 = self.norm2(src)
+        src2 = self.linear2(self.dropout(self.activation(self.linear1(src2))))
+        src = src + self.droppath2(self.dropout2(src2))
+        return src
+    
+    def forward(self, src, ctx,
+                src_mask: Optional[Tensor] = None,
+                src_key_padding_mask: Optional[Tensor] = None,
+                pos: Optional[Tensor] = None):
+        trans_out = self.forward_pre(src, src_mask, src_key_padding_mask, pos) \
+                    if self.normalize_before else \
+                    self.forward_post(src, src_mask, src_key_padding_mask, pos)
+        gate = torch.sigmoid(self._hyper_gate(ctx))
+        bias = self._hyper_bias(ctx)
+        return trans_out * gate + bias
     
 
 class Transformer_Decoder_Layer(nn.Module):
@@ -214,7 +283,8 @@ class Transformer_Encoder(nn.Module):
             "normalize_before": normalize_before
         }
 
-        self.layers = nn.ModuleList([Transformer_Encoder_Layer(**self.layer_args) for _ in range(self.num_layers)])
+        self.layers = nn.ModuleList([Transformer_Encoder_Layer(**self.layer_args) 
+                                     for _ in range(self.num_layers)])
 
     def forward(self, src,
                 mask: Optional[Tensor] = None,
@@ -224,6 +294,41 @@ class Transformer_Encoder(nn.Module):
 
         for _, layer in enumerate(self.layers):
             output = layer(output, src_mask=mask,
+                           src_key_padding_mask=src_key_padding_mask, pos=pos)
+        if self.norm is not None:
+            output = self.norm(output)
+
+        return output
+
+
+class ConcatTransformer_Encoder(nn.Module):
+    def __init__(self, num_layers, norm=None, d_model=512, nhead=8, dim_feedforward=2048, dropout=0.1,
+                 drop_path=0.4, activation="relu", normalize_before=True, ctx_dim=128):
+        super(ConcatTransformer_Encoder, self).__init__()
+        self.num_layers = num_layers
+        self.norm = norm
+        self.layer_args = {
+            "d_model": d_model,
+            "nhead": nhead,
+            "dim_feedforward": dim_feedforward,
+            "dropout": dropout,
+            "drop_path": drop_path,
+            "activation": activation,
+            "normalize_before": normalize_before,
+            "ctx_dim": ctx_dim,
+        }
+
+        self.layers = nn.ModuleList([ConcatTransformer_Encoder_Layer(**self.layer_args) 
+                                     for _ in range(self.num_layers)])
+
+    def forward(self, src, ctx,
+                mask: Optional[Tensor] = None,
+                src_key_padding_mask: Optional[Tensor] = None,
+                pos: Optional[Tensor] = None):
+        output = src
+
+        for _, layer in enumerate(self.layers):
+            output = layer(output, ctx, src_mask=mask,
                            src_key_padding_mask=src_key_padding_mask, pos=pos)
         if self.norm is not None:
             output = self.norm(output)

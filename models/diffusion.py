@@ -273,7 +273,7 @@ class TrajNet(Module):
 
 
 class TransformerConcatLinear(Module):
-    def __init__(self, cfg, point_dim, context_dim, 
+    def __init__(self, cfg, point_dim, context_dim, embed_dim=512,
                  tf_layer=4, residual=True, seq_len=32):
         super().__init__()
         self.residual = residual
@@ -284,26 +284,29 @@ class TransformerConcatLinear(Module):
         
         self.pos_emb = PositionEmbeddingSine(2 * context_dim, normalize=True)
 
-        self.concat1 = ConcatSquashLinear(dim_in=point_dim, dim_out=2 * context_dim, 
-                                          dim_ctx=context_dim+3)
+        self.concat1 = ConcatSquashLinear(dim_in=point_dim, dim_out=embed_dim, 
+                                          dim_ctx=context_dim + 3)
         
         self.encoder_param = {
             "num_layers": tf_layer,
-            "d_model": 2 * context_dim,
+            "d_model": embed_dim,
             "nhead": 8,
             "dim_feedforward": 2048,
             "dropout": 0.1,
+            "drop_path": 0.0,
             "normalize_before": True,
+            "ctx_dim": context_dim + 3,
         }
-        self.transformer_encoder = Transformer_Encoder(**self.encoder_param)
+        self.transformer_encoder = ConcatTransformer_Encoder(**self.encoder_param)
 
-        self.concat3 = ConcatSquashLinear(dim_in=2 * context_dim, dim_out=context_dim,
+        self.concat3 = ConcatSquashLinear(dim_in=embed_dim, dim_out=embed_dim,
                                           dim_ctx=context_dim + 3)
-        self.concat4 = ConcatSquashLinear(dim_in=context_dim, dim_out=context_dim // 2,
+        self.concat4 = ConcatSquashLinear(dim_in=context_dim, dim_out=context_dim * 2,
                                           dim_ctx=context_dim + 3)
         
-        self.linear = ConcatSquashLinear(dim_in=context_dim // 2, dim_out=point_dim, 
+        self.linear = ConcatSquashLinear(dim_in=context_dim * 2, dim_out=point_dim, 
                                          dim_ctx=context_dim + 3)
+        
         self.increase_dim_conv = nn.Sequential(nn.Conv2d(in_channels=seq_len, out_channels=seq_len,
                                                          kernel_size=(2, 1), stride=(1, 1), 
                                                          padding=(1, 0)),
@@ -425,6 +428,7 @@ def build_diffusion_model(diffnet: str = "TransformerConcatLinear",
         "tf_layer": cfg["diffu_num_trans_layers"],
         "residual": cfg["diffu_residual_trans"],
         "seq_len": cfg["T2F_encoder_sequence_length"],
+        "embed_dim": cfg["diffu_embed_dim"], 
         "cfg": cfg
     }
     if diffnet == "TransformerConcatLinear":

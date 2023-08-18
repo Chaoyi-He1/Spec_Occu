@@ -14,7 +14,7 @@
                 "--nproc_per_node", "2", 
                 "--use_env",
                 "main_diffusion.py",
-                "--freeze-encoder",
+                // "--freeze-encoder",
             ]
         }
     ]
