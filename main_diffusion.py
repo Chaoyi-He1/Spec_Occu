@@ -50,10 +50,10 @@ def get_args_parser():
     parser.add_argument('--save-best', action='store_true', help="save best model")
 
     # Optimization parameters
-    parser.add_argument('--lr', default=1e-4, type=float)
+    parser.add_argument('--lr', default=1e-5, type=float)
     parser.add_argument('--lrf', default=0.01, type=float)
     parser.add_argument('--weight_decay', default=0.0, type=float)
-    parser.add_argument('--epochs', default=30000, type=int)
+    parser.add_argument('--epochs', default=300, type=int)
     parser.add_argument('--batch_size', default=8, type=int)
     parser.add_argument('--num_workers', default=8, type=int)
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
@@ -236,8 +236,11 @@ def main(args):
         diffusion_model = torch.nn.parallel.DistributedDataParallel(diffusion_model, device_ids=[args.gpu])
         diffusion_model_without_ddp = diffusion_model.module
 
-        encoder = torch.nn.parallel.DistributedDataParallel(encoder, device_ids=[args.gpu])
-        encoder_without_ddp = encoder.module
+        if not args.freeze_encoder:
+            encoder = torch.nn.parallel.DistributedDataParallel(encoder, device_ids=[args.gpu])
+        encoder_without_ddp = encoder.module if isinstance(encoder, 
+                                                           torch.nn.parallel.DistributedDataParallel) \
+                              else encoder
     
     # # add graph to tensorboard
     # if args.rank in [-1, 0]:
