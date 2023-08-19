@@ -218,7 +218,7 @@ class Conv1d_encoder(nn.Module):
     
 
 class TrajNet(Module):
-    def __init__(self, point_dim: int = 1024, time_embed_dim: int = 256,
+    def __init__(self, point_dim: int = 1024, time_embed_dim: int = 3,
                  context_dim: int = 256, seq_len: int = 32,
                  residual: bool = True):
         super(TrajNet, self).__init__()
@@ -239,8 +239,11 @@ class TrajNet(Module):
         ])
         self.time_embed = None if time_embed_dim == 3 else \
                           PositionEmbeddingSine(context_dim, normalize=True)
+        self.increment_dim_conv = nn.Conv2d(in_channels=seq_len,
+                                            out_channels=seq_len,
+                                            kernel_size=(2, 1), stride=(1, 1), padding=(1, 0))
 
-    def forward(self, x, beta, context):
+    def forward(self, x, beta, context, t):
         """
         Args:
             x:  Point clouds at some timestep t, (B, N, d).
@@ -248,7 +251,7 @@ class TrajNet(Module):
             context:  Shape latents. (B, F).
         """
         batch_size = x.size(0)
-        x = self.reduce_dim_conv(x).squeeze(-2)      # (B, N, seq_len)
+        out = self.reduce_dim_conv(x).squeeze(-2)      # (B, N, seq_len)
         beta = beta.view(batch_size, 1, 1)          # (B, 1, 1)
         context = context.view(batch_size, 1, -1)   # (B, 1, F)
 
@@ -259,12 +262,13 @@ class TrajNet(Module):
         
         ctx_emb = torch.cat([time_emb, context], dim=-1)    # (B, 1, F+3)
 
-        out = x
         #pdb.set_trace()
         for i, layer in enumerate(self.layers):
             out = layer(ctx=ctx_emb, x=out)
             if i < len(self.layers) - 1:
                 out = self.act(out)
+        out = out.unsqueeze(-2)
+        out = self.increment_dim_conv(out)
 
         if self.residual:
             return x + out
@@ -277,6 +281,7 @@ class TransformerConcatLinear(Module):
                  tf_layer=4, residual=True, seq_len=32):
         super().__init__()
         self.residual = residual
+        self.init_norm = nn.BatchNorm2d(seq_len)
         self.reduce_dim_conv = nn.Conv2d(in_channels=seq_len,
                                          out_channels=seq_len,
                                          kernel_size=(2, 1), stride=(1, 1), padding=(0, 0))
@@ -320,24 +325,26 @@ class TransformerConcatLinear(Module):
 
     def forward(self, x, beta, context, t):
         batch_size = x.size(0)
-        x = self.reduce_dim_conv(x).squeeze(-2)
-        x = self.conv_1d_encoder(x, context, t, beta)
+        out = self.init_norm(x)
+        out = self.reduce_dim_conv(out).squeeze(-2)
+        out = self.conv_1d_encoder(out, context, t, beta)
         beta = beta.view(batch_size, 1, 1)          # (B, 1, 1)
         context = context.view(batch_size, 1, -1)   # (B, 1, F)
 
         time_emb = torch.cat([beta, torch.sin(beta), torch.cos(beta)], dim=-1)  # (B, 1, 3)
         ctx_emb = torch.cat([time_emb, context], dim=-1)    # (B, 1, F+3)
 
-        x = self.concat1(ctx_emb, x)
+        out = self.concat1(ctx_emb, out)
         # final_emb = x.permute(1,0,2).contiguous()
-        x += self.pos_emb(x)
+        out += self.pos_emb(out)
 
-        trans = self.transformer_encoder(x, ctx_emb)  # b * L+1 * 128
+        trans = self.transformer_encoder(out, ctx_emb)  # b * L+1 * 128
 
         trans = self.concat3(ctx_emb, trans)
         trans = self.concat4(ctx_emb, trans)
         trans = self.linear(ctx_emb, trans).unsqueeze(-2)
-        return self.increase_dim_conv(trans)
+        return self.increase_dim_conv(trans) + x if self.residual \
+            else self.increase_dim_conv(trans)
     
 
 class TransformerLinear(Module):
@@ -437,5 +444,8 @@ def build_diffusion_model(diffnet: str = "TransformerConcatLinear",
         return TransformerLinear(**transformer_param)
     elif diffnet == "LinearDecoder":
         return LinearDecoder(cfg["T2F_encoder_sequence_length"], cfg)
+    elif diffnet == "TrajNet":
+        return TrajNet(point_dim=cfg["Temporal_dim"], time_embed_dim=3,
+                       context_dim=cfg["feature_dim"], seq_len=cfg["T2F_encoder_sequence_length"])
     else:
         raise NotImplementedError

@@ -23,7 +23,7 @@ def train_one_epoch(encoder: torch.nn.Module, model: torch.nn.Module,
         # torch.autograd.set_detect_anomaly(True)
         history = history.to(device)
         future = future.to(device)
-
+        # initial_params = {name: param.clone() for name, param in model.named_parameters()}
         # Compute the output
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             features = encoder(history)
@@ -50,6 +50,13 @@ def train_one_epoch(encoder: torch.nn.Module, model: torch.nn.Module,
             scaler.update()
         else:
             optimizer.step()
+            
+        # params_updated = {name: param.clone() for name, param in model.named_parameters()}
+        # for name, initial_param in initial_params.items():
+        #     updated_param = params_updated[name]
+    
+        #     if not torch.all(torch.eq(initial_param, updated_param)):
+        #         print(f"Parameter {name} has been updated.")
             
         # torch.autograd.set_detect_anomaly(False)
         # Update metric
