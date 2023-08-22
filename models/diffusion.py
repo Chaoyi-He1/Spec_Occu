@@ -318,9 +318,19 @@ class TransformerConcatLinear(Module):
                                                nn.Conv2d(in_channels=seq_len, out_channels=seq_len,
                                                          kernel_size=(3, 3), stride=(1, 1),
                                                          padding=(1, 1)),
+                                               nn.BatchNorm2d(seq_len),
                                                nn.Conv2d(in_channels=seq_len, out_channels=seq_len,
                                                          kernel_size=(3, 3), stride=(1, 1),
                                                          padding=(1, 1)))
+        self.input_trans = nn.Sequential(
+            nn.Conv2d(in_channels=seq_len, out_channels=seq_len,
+                      kernel_size=(1, 7), stride=(1, 1), padding=(0, 3)),
+            nn.Conv2d(in_channels=seq_len, out_channels=seq_len,
+                      kernel_size=(1, 5), stride=(1, 1), padding=(0, 2)),
+            nn.Conv2d(in_channels=seq_len, out_channels=seq_len,
+                      kernel_size=(1, 3), stride=(1, 1), padding=(0, 1)),
+            nn.Conv2d(in_channels=seq_len, out_channels=seq_len,
+                      kernel_size=1, stride=1, padding=0),)         
         #self.linear = nn.Linear(128,2)
 
     def forward(self, x, beta, context, t):
@@ -343,6 +353,7 @@ class TransformerConcatLinear(Module):
         trans = self.concat3(ctx_emb, trans)
         trans = self.concat4(ctx_emb, trans)
         trans = self.linear(ctx_emb, trans).unsqueeze(-2)
+        x = self.input_trans(x)
         return self.increase_dim_conv(trans) + x if self.residual \
             else self.increase_dim_conv(trans)
     
