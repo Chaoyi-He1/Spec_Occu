@@ -8,6 +8,7 @@ train_eval/*.pyc
 util/__pycache__/*
 util/*.pyc
 datasets/__pycache__/*
+eval_visual/__pycache__/*
 datasets/*.pyc
 job.slurm
 output.log
