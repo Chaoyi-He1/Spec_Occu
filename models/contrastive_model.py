@@ -520,6 +520,22 @@ class Feature_Extractor(nn.Module):
                  in_type: str = "1d") -> None:
         super(Feature_Extractor, self).__init__()
         assert cfg is not None, "cfg should be a dict"
+        padding_input_proj = calculate_conv1d_padding(stride=1, kernel_size=7,
+                                                      d_in=cfg["Temporal_dim"], 
+                                                      d_out=cfg["feature_dim"])
+        self.input_residue_proj = nn.Sequential(
+            nn.Conv2d(in_channels=cfg["contrast_sequence_length"],
+                      out_channels=cfg["contrast_sequence_length"],
+                      kernel_size=(2, 1), stride=(1, 1), padding=(0, 0)),
+            nn.Flatten(start_dim=-2, end_dim=-1),
+            nn.Conv1d(in_channels=cfg["contrast_sequence_length"],
+                      out_channels=cfg["contrast_sequence_length"],
+                      kernel_size=7, stride=1, padding=padding_input_proj),
+            nn.Conv1d(in_channels=cfg["contrast_sequence_length"],
+                      out_channels=1,
+                      kernel_size=1, stride=1, padding=0),
+            nn.Flatten(start_dim=-2, end_dim=-1))
+        
         self.AutoEncoder_cfg = {
             "in_dim": (cfg["num_frames_per_clip"], cfg["Temporal_dim"]),
             "in_channel": cfg["in_channels"],
@@ -574,7 +590,7 @@ class Feature_Extractor(nn.Module):
         self.feature_dim = cfg["feature_dim"]
 
     def forward(self, inputs: Tensor) -> Tensor:
-        # inputs: [B, L, in_dim]; 
+        # inputs: [B, L, 2, in_dim]; 
         # B is the batch size; L is the sequence length, in_dim is the input temporal dimension
         # output: [B, feature_dim]
 
@@ -591,7 +607,7 @@ class Feature_Extractor(nn.Module):
 
         feature = self.regressor(encoder_outputs)  # [B, feature_dim]
         
-        return feature
+        return feature + self.input_residue_proj(inputs)
 
 
 def build_contrastive_model(cfg: dict = None, timestep: int = 12, pos_type: str = "sine") -> nn.Module:

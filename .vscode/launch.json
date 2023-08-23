@@ -13,7 +13,7 @@
             "args": [
                 "--nproc_per_node", "2", 
                 "--use_env",
-                "main_diffusion.py",
+                "main_contrast.py",
                 // "--freeze-encoder",
             ]
         }
