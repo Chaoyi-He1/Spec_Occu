@@ -520,7 +520,7 @@ class Feature_Extractor(nn.Module):
                  in_type: str = "1d") -> None:
         super(Feature_Extractor, self).__init__()
         assert cfg is not None, "cfg should be a dict"
-        padding_input_proj = calculate_conv1d_padding(stride=1, kernel_size=7,
+        padding_input_proj = calculate_conv1d_padding(stride=31, kernel_size=127,
                                                       d_in=cfg["Temporal_dim"], 
                                                       d_out=cfg["feature_dim"])
         self.input_residue_proj = nn.Sequential(
@@ -530,7 +530,7 @@ class Feature_Extractor(nn.Module):
             nn.Flatten(start_dim=-2, end_dim=-1),
             nn.Conv1d(in_channels=cfg["contrast_sequence_length"],
                       out_channels=cfg["contrast_sequence_length"],
-                      kernel_size=7, stride=1, padding=padding_input_proj),
+                      kernel_size=127, stride=31, padding=padding_input_proj),
             nn.Conv1d(in_channels=cfg["contrast_sequence_length"],
                       out_channels=1,
                       kernel_size=1, stride=1, padding=0),

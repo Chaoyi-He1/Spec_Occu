@@ -24,6 +24,7 @@ import util.misc as utils
 from datasets.dataset import Diffusion_multi_env
 from models.diffusion import *
 from models.contrastive_model import *
+from models.Temp_to_Freq_model import *
 from train_eval.train_eval_diffusion import *
 from util.diffusion import *
 from util.Temp_to_Freq import *
@@ -36,8 +37,11 @@ def get_args_parser():
     
     # Model parameters
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
-    parser.add_argument('--Temporal_model', type=str, default='weights/T2F/model_449.pth', help="Temporal model")
-    parser.add_argument('--diffusion_model', type=str, default='weights/diffusion/model_449.pth', help="Diffusion model")
+    parser.add_argument('--encoder-model', type=str, default='weights/contrast/model_449.pth', help="encoder path")
+    parser.add_argument('--Temporal-model', type=str, default='weights/T2F/model_449.pth', help="Temporal model")
+    parser.add_argument('--diffusion-model', type=str, default='weights/diffusion/model_449.pth', help="Diffusion model")
+    parser.add_argument('--positional-embedding', default='sine', choices=('sine', 'learned'),
+                        help="type of positional embedding to use on top of the image features")
     
     # dataset parameters
     parser.add_argument('--num_workers', default=5, type=int)
@@ -84,7 +88,61 @@ def main(args):
     print("Diffusion model dataloader generating...")
     nw = min([os.cpu_count(), args.batch_size if args.batch_size > 1 else 0, 8])  # number of workers
     print(f"Using {nw} dataloader workers every process")
+    data_loader_test = torch.utils.data.DataLoader(dataset_test, batch_sampler=batch_sampler_test,
+                                                   collate_fn=dataset_test.collate_fn, num_workers=nw)
     
-        
+    # model
+    print("model generating...")
+    variance = VarianceSchedule(num_steps=cfg["diffusion_num_steps"],
+                                mode=cfg["diffusion_schedule_mode"])
+    variance.to(device)
+
+    diffusion_model = build_diffusion_model(diffnet="TransformerConcatLinear", cfg=cfg)
+    diffusion_model.to(device)
+
+    diffusion_util = Diffusion_utils(var_sched=variance)
+    diffusion_util.to(device)
+
+    encoder = build_feature_extractor(cfg=cfg)
+    encoder.to(device)
+    
+    Temp_2_Freq = build_T2F(cfg=cfg, pos_type=args.positional_embedding)
+    Temp_2_Freq.to(device)
+    
+    # load model weights
+    print("Loading Contrastive encoder weights from {}".
+          format(args.encoder_model))
+    ckpt = torch.load(args.encoder_model, map_location='cpu')
+    try:
+        ckpt["model"] = {k: ckpt["model"][k] 
+                            for k, v in encoder.state_dict().items()
+                            if ckpt["model"][k].numel() == v.numel()}
+        encoder.load_state_dict(ckpt["model"], strict=False)
+    except KeyError as e:
+        s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
+            % (args.weights, args.hyp, args.weights)
+        raise KeyError(s) from e
+    del ckpt
+    print("Loading encoder from: ", args.encoder_path, "finished.")
+    
+    print("Loading Temporal model weights from {}".
+          format(args.Temporal_model))
+    ckpt = torch.load(args.Temporal_model, map_location='cpu')
+    try:
+        ckpt["model"] = {k: ckpt["model"][k] 
+                            for k, v in Temp_2_Freq.state_dict().items()
+                            if ckpt["model"][k].numel() == v.numel()}
+        Temp_2_Freq.load_state_dict(ckpt["model"], strict=False)
+    except KeyError as e:
+        s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
+            % (args.weights, args.hyp, args.weights)
+        raise KeyError(s) from e
+    del ckpt
+    print("Loading Temporal model from: ", args.Temporal_model, "finished.")
+    
+    print("Loading Diffusion model weights from {}".
+            format(args.diffusion_model))
+    ckpt = torch.load(args.diffusion_model, map_location='cpu') 
+    
         
         
