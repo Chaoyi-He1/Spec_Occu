@@ -3,16 +3,23 @@ import torch.nn as nn
 from util.misc import *
 from util.diffusion import *
 from typing import Iterable
+from itertools import chain
 
 
-def train_one_epoch(encoder: torch.nn.Module, model: torch.nn.Module, 
-                    criterion: Diffusion_utils, data_loader: Iterable, 
+def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module, 
+                    T2F_model: torch.nn.Module, diff_criterion: Diffusion_utils, 
+                    T2F_criterion: Diffusion_utils, data_loader: Iterable, 
                     optimizer: torch.optim.Optimizer, device: torch.device, 
-                    epoch: int, max_norm: float = 0.001, scaler=None):
-    
-    encoder.train()
-    model.train()
-    criterion.train()
+                    epoch: int, max_norm: float = 0.001, scaler=None, 
+                    freeze_encoder: bool =False):
+    if freeze_encoder:
+        encoder.eval()
+    else:
+        encoder.train()
+    diff_model.train()
+    T2F_model.eval()
+    diff_criterion.eval()
+    T2F_criterion.eval()
     metric_logger = MetricLogger(delimiter="; ")
     metric_logger.add_meter('loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     metric_logger.add_meter('lr', SmoothedValue(window_size=1, fmt='{value:.6f}'))
@@ -23,27 +30,36 @@ def train_one_epoch(encoder: torch.nn.Module, model: torch.nn.Module,
         # torch.autograd.set_detect_anomaly(True)
         history = history.to(device)
         future = future.to(device)
+        future_labels = future_labels.to(device)
         # initial_params = {name: param.clone() for name, param in model.named_parameters()}
         # Compute the output
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             features = encoder(history)
-            BCELoss = criterion.get_loss(x_0=future, context=features, model=model)
+            BCELoss = diff_criterion.get_loss(x_0=future, context=features, model=diff_model)
+            predict = diff_criterion.sample(num_points=future.shape[1], context=features, sample=1, bestof=False, step=10,
+                                       model=diff_model, point_dim=future.shape[-1], flexibility=0.0, ret_traj=False, sampling="ddpm")
+            predict_label = T2F_model(predict)
+            label_loss = T2F_criterion(predict_label, future_labels)
+            loss = BCELoss + label_loss
+            
 
-        if torch.isnan(BCELoss):
+        if torch.isnan(BCELoss) or torch.isnan(label_loss) or torch.isnan(loss):
             raise ValueError('NaN loss detected')
             
         # reduce losses over all GPUs for logging purposes
-        BCELoss_reduced = reduce_loss(BCELoss)
+        loss_reduced = reduce_loss(loss)
 
         # Backward
         optimizer.zero_grad()
         if scaler is not None:
-            scaler.scale(BCELoss).backward()
+            scaler.scale(loss).backward()
         else:
             BCELoss.backward()
         
         if max_norm > 0:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+            params = diff_model.parameters() if freeze_encoder \
+                else chain(diff_model.parameters(), encoder.parameters())
+            torch.nn.utils.clip_grad_norm_(params, max_norm)
         
         if scaler is not None:
             scaler.step(optimizer)
@@ -60,7 +76,7 @@ def train_one_epoch(encoder: torch.nn.Module, model: torch.nn.Module,
             
         # torch.autograd.set_detect_anomaly(False)
         # Update metric
-        metric_logger.update(loss=BCELoss_reduced.item())
+        metric_logger.update(loss=loss_reduced.item())
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
 
     # gather the stats from all processes

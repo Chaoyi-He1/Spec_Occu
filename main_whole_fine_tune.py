@@ -24,6 +24,7 @@ import util.misc as utils
 from datasets.dataset import Diffusion_multi_env
 from models.diffusion import *
 from models.contrastive_model import *
+from models.Temp_to_Freq_model import *
 from train_eval.train_eval_diffusion import *
 from util.diffusion import *
 
@@ -39,14 +40,17 @@ def get_args_parser():
     parser.add_argument('--eval', action='store_true', help='only evaluate model on validation set')
 
     # Model parameters
-    parser.add_argument('--resume', type=str, default='weights/diffusion/model_052.pth', help="initial weights path")  # weights/model_940.pth
+    parser.add_argument('--resume', type=str, default='weights/fine_tune/model_052.pth', help="initial weights path")  # weights/model_940.pth
     parser.add_argument('--encoder-path', type=str, default='', help="encoder path")
+    parser.add_argument('--T2F-path', type=str, default='weights/T2F/model_052.pth', help="T2F path")
+    parser.add_argument('--diffusion-path', type=str, default='weights/diffusioni/model_052.pth', help="diffusion path")
     parser.add_argument('--time-step', type=int, default=32, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
     parser.add_argument('--positional-embedding', default='learned', choices=('sine', 'learned'),
                         help="type of positional embedding to use on top of the image features")
     parser.add_argument('--sync-bn', action='store_true', help='enabling apex sync BN.')
     parser.add_argument('--freeze-encoder', action='store_true', help="freeze the encoder")
+    parser.add_argument('--freeze-diffusion', action='store_true', help="freeze the diffusion model")
     parser.add_argument('--save-best', action='store_true', help="save best model")
 
     # Optimization parameters
@@ -163,6 +167,9 @@ def main(args):
     encoder = build_feature_extractor(cfg=cfg)
     encoder.to(device)
     
+    T2F_model = build_T2F(cfg=cfg)
+    T2F_model.to(device)
+    
     # load previous model if resume training
     start_epoch = 0
     scaler = torch.cuda.amp.GradScaler() if args.amp else None
@@ -204,7 +211,7 @@ def main(args):
         del ckpt
         print("Loading model from: ", args.resume, "finished.")
     
-    if args.encoder_path.endswith(".pth"):
+    if args.encoder_path.endswith(".pth") and not args.diffusion_path.endswith(".pth"):
         print("Loading encoder from: ", args.encoder_path)
         ckpt = torch.load(args.encoder_path, map_location='cpu')
         try:
@@ -219,11 +226,31 @@ def main(args):
         del ckpt
         print("Loading encoder from: ", args.encoder_path, "finished.")
     
+    if args.T2F_path.endswith(".pth"):
+        print("Loading T2F model from: ", args.T2F_path)
+        ckpt = torch.load(args.T2F_path, map_location='cpu')
+        try:
+            ckpt["model"] = {k: ckpt["model"][k]
+                                 for k, v in T2F_model.state_dict().items()
+                                 if ckpt["model"][k].numel() == v.numel()}
+            T2F_model.load_state_dict(ckpt["model"], strict=False)
+        except KeyError as e:
+            s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
+                % (args.weights, args.hyp, args.weights)
+            raise KeyError(s) from e
+        del ckpt
+        print("Loading T2F model from: ", args.T2F_path, "finished.")
+            
+    
     # freeze encoder if args.freeze_encoder is true
     if args.freeze_encoder:
         for param in encoder.parameters():
                 param.requires_grad = False
         print("Encoder frozen.")
+    
+    for param in T2F_model.parameters():
+        param.requires_grad = False
+    print("T2F model frozen.")
     
     # synchronize batch norm layers if args.sync_bn is true
     if args.sync_bn:
@@ -291,7 +318,7 @@ def main(args):
             sampler_train.set_epoch(epoch)
         
         # train
-        train_loss_dict = train_one_epoch(encoder=encoder, model=diffusion_model,
+        train_loss_dict = train_one_epoch(encoder=encoder, diff_model=diffusion_model, T2F_model=T2F_model,
                                           criterion=diffusion_util, data_loader=data_loader_train,
                                           optimizer=optimizer, epoch=epoch, scaler=scaler,
                                           device=device)
