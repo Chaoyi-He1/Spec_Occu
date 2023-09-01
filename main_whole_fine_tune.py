@@ -40,9 +40,9 @@ def get_args_parser():
     parser.add_argument('--eval', action='store_true', help='only evaluate model on validation set')
 
     # Model parameters
-    parser.add_argument('--resume', type=str, default='weights/fine_tune/model_052.pth', help="initial weights path")  # weights/model_940.pth
+    parser.add_argument('--resume', type=str, default='weights/fine_tune/', help="initial weights path")  # weights/model_940.pth
     parser.add_argument('--encoder-path', type=str, default='', help="encoder path")
-    parser.add_argument('--T2F-path', type=str, default='weights/T2F/model_052.pth', help="T2F path")
+    parser.add_argument('--T2F-path', type=str, default='weights/T2F/model_449.pth', help="T2F path")
     parser.add_argument('--diffusion-path', type=str, default='weights/diffusioni/model_052.pth', help="diffusion path")
     parser.add_argument('--time-step', type=int, default=32, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
@@ -321,7 +321,7 @@ def main(args):
         train_loss_dict = train_one_epoch(encoder=encoder, diff_model=diffusion_model, T2F_model=T2F_model,
                                           criterion=diffusion_util, data_loader=data_loader_train,
                                           optimizer=optimizer, epoch=epoch, scaler=scaler,
-                                          device=device)
+                                          device=device, freeze_encoder=args.freeze_encoder)
         scheduler.step()
 
         # evaluate
@@ -362,6 +362,7 @@ def main(args):
                     "encoder": encoder_without_ddp.state_dict() if args.distributed else encoder.state_dict(),
                     "diffusion_util": diffusion_util.state_dict() if args.distributed
                                       else diffusion_util.state_dict(),
+                    "T2F_model": T2F_model.state_dict(),
                     "optimizer": optimizer.state_dict(),
                     "scaler": scaler.state_dict() if scaler is not None else None,
                     "lr_scheduler": scheduler.state_dict(),

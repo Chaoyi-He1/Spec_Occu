@@ -4,6 +4,7 @@ from util.misc import *
 from util.diffusion import *
 from typing import Iterable
 from itertools import chain
+from util.Temp_to_Freq import F1_score
 
 
 def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module, 
@@ -18,11 +19,12 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         encoder.train()
     diff_model.train()
     T2F_model.eval()
-    diff_criterion.eval()
-    T2F_criterion.eval()
+    diff_criterion.train()
+    T2F_criterion.train()
     metric_logger = MetricLogger(delimiter="; ")
     metric_logger.add_meter('loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     metric_logger.add_meter('lr', SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter('F1_score', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
     
     for _, (history, hist_labels,
@@ -38,9 +40,10 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             BCELoss = diff_criterion.get_loss(x_0=future, context=features, model=diff_model)
             predict = diff_criterion.sample(num_points=future.shape[1], context=features, sample=1, bestof=False, step=10,
                                        model=diff_model, point_dim=future.shape[-1], flexibility=0.0, ret_traj=False, sampling="ddpm")
-            predict_label = T2F_model(predict)
+            predict_label = T2F_model(predict.squeeze())
             label_loss = T2F_criterion(predict_label, future_labels)
             loss = BCELoss + label_loss
+            F1score = F1_score(predict_label, future_labels)
             
 
         if torch.isnan(BCELoss) or torch.isnan(label_loss) or torch.isnan(loss):
@@ -75,9 +78,11 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         #         print(f"Parameter {name} has been updated.")
             
         # torch.autograd.set_detect_anomaly(False)
+        
         # Update metric
         metric_logger.update(loss=loss_reduced.item())
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
+        metric_logger.update(F1_score=torch.stack(F1score).mean().item())
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
