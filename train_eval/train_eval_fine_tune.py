@@ -24,6 +24,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     metric_logger = MetricLogger(delimiter="; ")
     metric_logger.add_meter('loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     metric_logger.add_meter('lr', SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter('acc', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     metric_logger.add_meter('F1_score', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
     
@@ -41,7 +42,8 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             predict = diff_criterion.sample(num_points=future.shape[1], context=features, sample=1, bestof=False, step=10,
                                        model=diff_model, point_dim=future.shape[-1], flexibility=0.0, ret_traj=False, sampling="ddpm")
             predict_label = T2F_model(predict.squeeze())
-            label_loss = T2F_criterion(predict_label, future_labels)
+            label_loss, acc_steps = T2F_criterion(predict_label, future_labels)
+            acc = acc_steps.mean()
             loss = BCELoss + label_loss
             F1score = F1_score(predict_label, future_labels)
             
@@ -51,6 +53,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             
         # reduce losses over all GPUs for logging purposes
         loss_reduced = reduce_loss(loss)
+        acc_reduced = reduce_loss(acc)
 
         # Backward
         optimizer.zero_grad()
@@ -82,6 +85,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         # Update metric
         metric_logger.update(loss=loss_reduced.item())
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
+        metric_logger.update(acc=acc_reduced.item())
         metric_logger.update(F1_score=torch.stack(F1score).mean().item())
 
     # gather the stats from all processes
