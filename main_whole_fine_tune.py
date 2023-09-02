@@ -25,8 +25,9 @@ from datasets.dataset import Diffusion_multi_env
 from models.diffusion import *
 from models.contrastive_model import *
 from models.Temp_to_Freq_model import *
-from train_eval.train_eval_diffusion import *
+from train_eval.train_eval_fine_tune import *
 from util.diffusion import *
+from util.Temp_to_Freq import Temporal_Freq_Loss
 
 
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -42,7 +43,7 @@ def get_args_parser():
     # Model parameters
     parser.add_argument('--resume', type=str, default='weights/fine_tune/', help="initial weights path")  # weights/model_940.pth
     parser.add_argument('--encoder-path', type=str, default='', help="encoder path")
-    parser.add_argument('--T2F-path', type=str, default='weights/T2F/model_449.pth', help="T2F path")
+    parser.add_argument('--T2F-path', type=str, default='weights/T2F/conv/model_449.pth', help="T2F path")
     parser.add_argument('--diffusion-path', type=str, default='weights/diffusioni/model_052.pth', help="diffusion path")
     parser.add_argument('--time-step', type=int, default=32, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
@@ -169,6 +170,10 @@ def main(args):
     
     T2F_model = build_T2F(cfg=cfg)
     T2F_model.to(device)
+    
+    # loss function
+    T2F_criterion = Temporal_Freq_Loss(time_step_weights=cfg["time_step_weights"])
+    T2F_criterion.to(device)
     
     # load previous model if resume training
     start_epoch = 0
@@ -319,9 +324,9 @@ def main(args):
         
         # train
         train_loss_dict = train_one_epoch(encoder=encoder, diff_model=diffusion_model, T2F_model=T2F_model,
-                                          criterion=diffusion_util, data_loader=data_loader_train,
-                                          optimizer=optimizer, epoch=epoch, scaler=scaler,
-                                          device=device, freeze_encoder=args.freeze_encoder)
+                                          diff_criterion=diffusion_util, T2F_criterion=T2F_criterion,
+                                          data_loader=data_loader_train, optimizer=optimizer, 
+                                          epoch=epoch, scaler=scaler, device=device, freeze_encoder=args.freeze_encoder)
         scheduler.step()
 
         # evaluate
