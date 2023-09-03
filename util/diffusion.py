@@ -38,7 +38,7 @@ class Diffusion_utils(nn.Module):
         return loss
 
 
-    def sample(self, num_points, context, sample, bestof, model: nn.Module,
+    def sample(self, num_points, context, sample, bestof, model: nn.Module, fine_tune=False,
                point_dim=2, flexibility=0.0, ret_traj=False, sampling="ddpm", step=1):
         """
         Sample from the diffusion model.
@@ -78,8 +78,8 @@ class Diffusion_utils(nn.Module):
                     x_next = alpha_bar_next.sqrt() * x0_t + (1 - alpha_bar_next).sqrt() * e_theta
                 else:
                     pdb.set_trace()
-                traj[t-stride] = x_next.detach()     # Stop gradient and save trajectory.
-                traj[t] = traj[t].cpu()         # Move previous output to CPU memory.
+                traj[t-stride] = x_next.detach() if not fine_tune else x_next    # Stop gradient and save trajectory.
+                traj[t] = traj[t].cpu() if not fine_tune else traj[t]         # Move previous output to CPU memory.
                 if not ret_traj:
                    del traj[t]
 

@@ -18,7 +18,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     else:
         encoder.train()
     diff_model.train()
-    T2F_model.eval()
+    T2F_model.train()
     diff_criterion.train()
     T2F_criterion.train()
     metric_logger = MetricLogger(delimiter="; ")
@@ -30,7 +30,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     
     for _, (history, hist_labels,
             future, future_labels) in enumerate(metric_logger.log_every(data_loader, 10, header)):
-        # torch.autograd.set_detect_anomaly(True)
+        torch.autograd.set_detect_anomaly(True)
         history = history.to(device)
         future = future.to(device)
         future_labels = future_labels.to(device)
@@ -39,12 +39,12 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             features = encoder(history)
             BCELoss = diff_criterion.get_loss(x_0=future, context=features, model=diff_model)
-            predict = diff_criterion.sample(num_points=future.shape[1], context=features, sample=1, bestof=False, step=10,
+            predict = diff_criterion.sample(num_points=future.shape[1], context=features, sample=1, bestof=False, step=10, fine_tune=True,
                                        model=diff_model, point_dim=future.shape[-1], flexibility=0.0, ret_traj=False, sampling="ddpm")
             predict_label = T2F_model(predict.squeeze())
             label_loss, acc_steps = T2F_criterion(predict_label, future_labels)
             acc = acc_steps.mean()
-            loss = BCELoss + label_loss
+            loss = label_loss
             F1score = F1_score(predict_label, future_labels)
             
 
@@ -58,9 +58,9 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         # Backward
         optimizer.zero_grad()
         if scaler is not None:
-            scaler.scale(loss).backward()
+            scaler.scale(predict_label.mean()).backward()
         else:
-            BCELoss.backward()
+            loss.backward()
         
         if max_norm > 0:
             params = diff_model.parameters() if freeze_encoder \
@@ -80,7 +80,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         #     if not torch.all(torch.eq(initial_param, updated_param)):
         #         print(f"Parameter {name} has been updated.")
             
-        # torch.autograd.set_detect_anomaly(False)
+        torch.autograd.set_detect_anomaly(False)
         
         # Update metric
         metric_logger.update(loss=loss_reduced.item())
