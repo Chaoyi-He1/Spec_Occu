@@ -13,3 +13,4 @@ datasets/*.pyc
 job.slurm
 output.log
 *.txt
+*.swp
