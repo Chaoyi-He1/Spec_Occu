@@ -191,9 +191,9 @@ def main(args):
                                if encoder.state_dict()[k].numel() == v.numel()}
             encoder.load_state_dict(ckpt["encoder"], strict=False)
 
-            ckpt["diffusion_util"] = {k: v for k, v in ckpt["diffusion_util"].items()
-                                      if diffusion_util.state_dict()[k].numel() == v.numel()}
-            diffusion_util.load_state_dict(ckpt["diffusion_util"], strict=False)
+            # ckpt["diffusion_util"] = {k: v for k, v in ckpt["diffusion_util"].items()
+            #                           if diffusion_util.state_dict()[k].numel() == v.numel()}
+            # diffusion_util.load_state_dict(ckpt["diffusion_util"], strict=False)
         
         except KeyError as e:
             s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
@@ -253,9 +253,9 @@ def main(args):
                 param.requires_grad = False
         print("Encoder frozen.")
     
-    # for param in T2F_model.parameters():
-    #     param.requires_grad = False
-    # print("T2F model frozen.")
+    for param in T2F_model.parameters():
+        param.requires_grad = False
+    print("T2F model frozen.")
     
     # synchronize batch norm layers if args.sync_bn is true
     if args.sync_bn:

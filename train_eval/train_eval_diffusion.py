@@ -8,9 +8,11 @@ from typing import Iterable
 def train_one_epoch(encoder: torch.nn.Module, model: torch.nn.Module, 
                     criterion: Diffusion_utils, data_loader: Iterable, 
                     optimizer: torch.optim.Optimizer, device: torch.device, 
-                    epoch: int, max_norm: float = 0.001, scaler=None):
-    
-    encoder.train()
+                    epoch: int, max_norm: float = 0.01, scaler=None):
+    if encoder.requires_grad_:
+        encoder.train()
+    else:
+        encoder.eval()
     model.train()
     criterion.train()
     metric_logger = MetricLogger(delimiter="; ")

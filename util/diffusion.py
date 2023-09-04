@@ -38,7 +38,7 @@ class Diffusion_utils(nn.Module):
         return loss
 
 
-    def sample(self, num_points, context, sample, bestof, model: nn.Module, fine_tune=False,
+    def sample(self, num_points, context, sample, bestof, model: nn.Module,
                point_dim=2, flexibility=0.0, ret_traj=False, sampling="ddpm", step=1):
         """
         Sample from the diffusion model.
@@ -78,8 +78,8 @@ class Diffusion_utils(nn.Module):
                     x_next = alpha_bar_next.sqrt() * x0_t + (1 - alpha_bar_next).sqrt() * e_theta
                 else:
                     pdb.set_trace()
-                traj[t-stride] = x_next.detach() if not fine_tune else x_next    # Stop gradient and save trajectory.
-                traj[t] = traj[t].cpu() if not fine_tune else traj[t]         # Move previous output to CPU memory.
+                traj[t-stride] = x_next.detach()     # Stop gradient and save trajectory.
+                traj[t] = traj[t].cpu()         # Move previous output to CPU memory.
                 if not ret_traj:
                    del traj[t]
 
@@ -88,6 +88,60 @@ class Diffusion_utils(nn.Module):
             else:
                 traj_list.append(traj[0])
         return torch.stack(traj_list)
+    
+    
+    def sample_fine_tune(self, num_points, context, sample, bestof, model: nn.Module,
+                         point_dim=2, flexibility=0.0, ret_traj=False, sampling="ddpm", 
+                         step=1):
+        """
+        Sample from the diffusion model.
+        DDPM: Denoising Diffusion Probabilistic Models
+        https://arxiv.org/abs/2006.11239
+        DDIM: Denoising Diffusion Implicit Models
+        https://arxiv.org/abs/2010.02502
+        """
+        traj_list = []
+        for _ in range(sample):
+            batch_size = context.size(0)
+            if bestof:
+                x_T = torch.randn([batch_size, num_points, 2, point_dim]).to(context.device)
+            else:
+                x_T = torch.zeros([batch_size, num_points, 2, point_dim]).to(context.device)
+            traj = {self.var_sched.num_steps: x_T}
+            stride = step
+
+            for t in range(self.var_sched.num_steps, 0, -stride):
+                z = torch.randn_like(x_T) if t > 1 else torch.zeros_like(x_T)
+                alpha = self.var_sched.alphas[t]
+                alpha_bar = self.var_sched.alpha_bars[t]
+                alpha_bar_next = self.var_sched.alpha_bars[t-stride]    # next: closer to 1
+                # pdb.set_trace()
+                sigma = self.var_sched.get_sigmas(t, flexibility)
+
+                c0 = 1.0 / torch.sqrt(alpha)
+                c1 = (1 - alpha) / torch.sqrt(1 - alpha_bar)
+
+                x_t = traj[t]
+                feature = torch.randn([batch_size, 128]).to(context.device)
+                beta = self.var_sched.betas[[t] * batch_size].clone()
+                e_theta = model(x_t, beta=beta, context=feature, t=t)
+                if sampling == "ddpm":
+                    x_next = c0 * (x_t - c1 * e_theta) + sigma * z
+                elif sampling == "ddim":
+                    x0_t = (x_t - e_theta * (1 - alpha_bar).sqrt()) / alpha_bar.sqrt()
+                    x_next = alpha_bar_next.sqrt() * x0_t + (1 - alpha_bar_next).sqrt() * e_theta
+                else:
+                    pdb.set_trace()
+                traj[t-stride] = x_next     # Stop gradient and save trajectory.
+                traj[t] = traj[t]         # Move previous output to CPU memory.
+                if not ret_traj:
+                   del traj[t]
+            if ret_traj:
+                traj_list.append(traj)
+            else:
+                traj_list.append(traj[0])
+                
+        return traj_list[0]
 
 
 def compute_batch_statistics(predictions, gt_future):

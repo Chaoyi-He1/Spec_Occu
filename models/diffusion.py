@@ -353,8 +353,8 @@ class TransformerConcatLinear(Module):
         trans = self.concat3(ctx_emb, trans)
         trans = self.concat4(ctx_emb, trans)
         trans = self.linear(ctx_emb, trans).unsqueeze(-2)
-        x = self.input_trans(x)
-        return self.increase_dim_conv(trans) + x if self.residual \
+        x_ = self.input_trans(x)
+        return self.increase_dim_conv(trans) + x_ if self.residual \
             else self.increase_dim_conv(trans)
     
 

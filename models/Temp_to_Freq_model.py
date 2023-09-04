@@ -417,11 +417,11 @@ class Conv1d_Temp_2_Freq(nn.Module):
                 T: T2F_encoder_embed_dim, length of time dimension
                 2: real and imag channels
         """
-        inputs = self.reduce_dim_conv(inputs).squeeze(-2)
+        x = self.reduce_dim_conv(inputs).squeeze(-2)
         for layer in self.ResNet:
-            inputs = layer(inputs)
-        inputs = self.classify_head(inputs)
-        return inputs
+            x = layer(x)
+        x = self.classify_head(x)
+        return x
         
 
 def build_T2F(cfg: dict = None, pos_type: str = "sine", 
