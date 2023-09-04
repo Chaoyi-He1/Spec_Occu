@@ -7,7 +7,7 @@ from itertools import chain
 from util.Temp_to_Freq import F1_score
 import torch.nn.functional as F
 from util.diffusion import Diffusion_utils
-from util.Temp_to_Freq import Temporal_Freq_Loss
+from util.Temp_to_Freq import Temporal_Freq_Loss, F1_score
 
 
 def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module, 
@@ -35,28 +35,32 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         history = history.to(device)
         future = future.to(device)
         future_labels = future_labels.to(device)
-        # initial_params = {name: param.clone() for name, param in model.named_parameters()}
+        
         # Compute the output
-        with torch.cuda.amp.autocast(enabled=scaler is not None):
+        with torch.no_grad(), torch.cuda.amp.autocast(enabled=scaler is not None):
             features = encoder(history)
-            # BCELoss = diff_criterion.get_loss(x_0=future, context=features, model=diff_model)
-            predict = diff_criterion.sample_fine_tune(num_points=future.shape[1], context=features.clone().detach(),
+            predict = diff_criterion.sample_fine_tune(num_points=future.shape[1], context=features,
                                                       sample=1, bestof=False, step=10, flexibility=0.0, 
                                                       model=diff_model, point_dim=future.shape[-1], 
                                                       ret_traj=False, sampling="ddpm")
-            predict_label = T2F_model(predict.squeeze())
-            label_loss, acc_steps = T2F_criterion(predict_label, future_labels)
+            predict_label = T2F_model(predict).detach()
+            BCELoss, acc_steps = T2F_criterion(predict_label, future_labels)
             acc = acc_steps.mean()
-            loss = label_loss
-            # F1score = F1_score(predict_label, future_labels)
+            F1score = F1_score(predict_label, future_labels)
             
+        with torch.cuda.amp.autocast(enabled=scaler is not None):
+            features = encoder(history)
+            BCELoss = diff_criterion.get_loss_fine_tune(x_0=future, context=features, model=diff_model)
+        
+        loss = (BCELoss * (1 + 1e-4 - F1score)).mean()
+            # F1score = F1_score(predict_label, future_labels)
 
         if torch.isnan(loss):
             raise ValueError('NaN loss detected')
             
         # reduce losses over all GPUs for logging purposes
         loss_reduced = reduce_loss(loss)
-        # acc_reduced = reduce_loss(acc)
+        acc_reduced = reduce_loss(acc)
 
         # Backward
         optimizer.zero_grad()
@@ -67,7 +71,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         
         if max_norm > 0:
             params = diff_model.parameters() if freeze_encoder \
-                else chain(diff_model.parameters(), encoder.parameters())
+                else chain(encoder.parameters(), diff_model.parameters())
             torch.nn.utils.clip_grad_norm_(params, max_norm)
         
         if scaler is not None:
@@ -88,8 +92,8 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         # Update metric
         metric_logger.update(loss=loss_reduced.item())
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
-        # metric_logger.update(acc=acc_reduced.item())
-        # metric_logger.update(F1_score=torch.stack(F1score).mean().item())
+        metric_logger.update(acc=acc_reduced.item())
+        metric_logger.update(F1_score=torch.stack(F1score).mean().item())
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()

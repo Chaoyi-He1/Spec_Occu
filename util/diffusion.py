@@ -37,6 +37,34 @@ class Diffusion_utils(nn.Module):
         loss = F.mse_loss(e_theta, e_rand, reduction='mean')
         return loss
 
+    
+    def get_loss_fine_tune(self, x_0, context, t=None, model: nn.Module=None):
+        """
+        Diffusion loss.
+        Based on Denoising Diffusion Probabilistic Models
+        equation (14) in
+        https://arxiv.org/abs/2006.11239
+        Loss = ||\epsilon - \epsilon_theta(\sqrt(\alpha_bar_t x0) + \sqrt(1 - \alpha_bar_t \epsilon)
+                                          , t)||^2
+        """
+        model.train()
+        batch_size = x_0.shape[0]   # (B, N, c, d)
+        if t == None:
+            t = self.var_sched.uniform_sample_t(batch_size)
+
+        alpha_bar = self.var_sched.alpha_bars[t]
+        beta = self.var_sched.betas[t].cuda()
+
+        c0 = torch.sqrt(alpha_bar).view(-1, 1, 1, 1).cuda()       # (B, 1, 1, 1)
+        c1 = torch.sqrt(1 - alpha_bar).view(-1, 1, 1, 1).cuda()   # (B, 1, 1, 1)
+
+        e_rand = torch.randn_like(x_0).cuda()  # (B, N, c, d)
+
+        e_theta = model(c0 * x_0 + c1 * e_rand, beta=beta, context=context, t=t)
+        loss = F.mse_loss(e_theta, e_rand, reduction='none')
+        loss = loss.mean(dim=(0, -2, -1))
+        return loss
+
 
     def sample(self, num_points, context, sample, bestof, model: nn.Module,
                point_dim=2, flexibility=0.0, ret_traj=False, sampling="ddpm", step=1):
@@ -100,6 +128,7 @@ class Diffusion_utils(nn.Module):
         DDIM: Denoising Diffusion Implicit Models
         https://arxiv.org/abs/2010.02502
         """
+        model.eval()
         traj_list = []
         for _ in range(sample):
             batch_size = context.size(0)
@@ -132,8 +161,8 @@ class Diffusion_utils(nn.Module):
                     x_next = alpha_bar_next.sqrt() * x0_t + (1 - alpha_bar_next).sqrt() * e_theta
                 else:
                     pdb.set_trace()
-                traj[t-stride] = x_next     # Stop gradient and save trajectory.
-                traj[t] = traj[t]         # Move previous output to CPU memory.
+                traj[t-stride] = x_next.detach()     # Stop gradient and save trajectory.
+                traj[t] = traj[t].cpu()         # Move previous output to CPU memory.
                 if not ret_traj:
                    del traj[t]
             if ret_traj:
