@@ -52,7 +52,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             features = encoder(history)
             BCELoss = diff_criterion.get_loss_fine_tune(x_0=future, context=features, model=diff_model)
         
-        loss = (BCELoss * (1 + 1e-4 - torch.stack(F1score))).mean()
+        loss = (BCELoss * (2 - torch.stack(F1score))).mean()
             # F1score = F1_score(predict_label, future_labels)
 
         if torch.isnan(loss):
