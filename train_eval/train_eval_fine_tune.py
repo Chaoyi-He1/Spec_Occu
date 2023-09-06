@@ -27,7 +27,6 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     metric_logger.add_meter('acc', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     metric_logger.add_meter('F1_score', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
-    optimizer.zero_grad()
     
     for _, (history, hist_labels,
             future, future_labels) in enumerate(metric_logger.log_every(data_loader, 10, header)):
