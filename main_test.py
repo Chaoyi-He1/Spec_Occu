@@ -244,8 +244,7 @@ def main(args):
     
     # write results
     log_stats = {**{f'train_{k}': v for k, v in train_loss_dict.items()},
-                    **{f'test_{k}': v for k, v in val_loss_dict.items()},
-                    'epoch': epoch}
+                 **{f'test_{k}': v for k, v in val_loss_dict.items()}}
     if args.output_dir and utils.is_main_process():
         with (output_dir).open("a") as f:
             f.write(json.dumps(log_stats) + "\n")
