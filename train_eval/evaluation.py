@@ -11,9 +11,9 @@ from util.Temp_to_Freq import Temporal_Freq_Loss, F1_score
 
 
 def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module, 
-                    T2F_model: torch.nn.Module, diff_criterion: Diffusion_utils, 
-                    T2F_criterion: Temporal_Freq_Loss, data_loader: Iterable, 
-                    device: torch.device, scaler=None):
+             T2F_model: torch.nn.Module, diff_criterion: Diffusion_utils, 
+             T2F_criterion: Temporal_Freq_Loss, data_loader: Iterable, 
+             device: torch.device, scaler=None):
     encoder.eval()
     diff_model.eval()
     T2F_model.eval()
@@ -41,11 +41,12 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             predicts = diff_criterion.sample(num_points=future.shape[1], context=features,
                                             sample=20, bestof=False, step=10, flexibility=0.0, 
                                             model=diff_model, point_dim=future.shape[-1], 
-                                            ret_traj=False, sampling="ddpm")
+                                            ret_traj=False, sampling="ddpm") / 50
             
             predict_labels = [T2F_model(predict) for predict in predicts]
-            BCELoss, acc_steps = [T2F_criterion(predict_label, future_labels) for predict_label in predict_labels]
-            F1scores = [F1_score(predict_label, future_labels) for predict_label in predict_labels]
+            BCELoss, acc_steps = zip(*[T2F_criterion(predict_label, future_labels) for predict_label in predict_labels])
+            F1scores = [torch.stack(F1_score(predict_label, future_labels))
+                        for predict_label in predict_labels]
             acc = torch.stack(acc_steps).mean()
             F1score = torch.stack(F1scores).mean(dim=0)
         
@@ -53,7 +54,8 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             best_history, best_hist_labels, best_future, best_future_labels = history, hist_labels, future, future_labels
             best_acc, best_F1score = acc, F1score.mean()
             
-        metric_logger.update(loss=BCELoss.item(), acc=acc.item(), F1_score=F1score.mean().item())
+        metric_logger.update(loss=torch.stack(BCELoss).mean().item(), 
+                             acc=acc.item(), F1_score=F1score.mean().item())
     
     return best_history, best_hist_labels, best_future, best_future_labels, \
            {k: meter.global_avg for k, meter in metric_logger.meters.items()}

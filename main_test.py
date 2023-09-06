@@ -25,7 +25,7 @@ from datasets.dataset import Diffusion_multi_env
 from models.diffusion import *
 from models.contrastive_model import *
 from models.Temp_to_Freq_model import *
-from train_eval.train_eval_fine_tune import *
+from train_eval.evaluation import *
 from util.diffusion import *
 from util.Temp_to_Freq import Temporal_Freq_Loss
 
@@ -92,8 +92,8 @@ def main(args):
     # fix the seed for reproducibility
     seed = args.seed + utils.get_rank()
     torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
+    # np.random.seed(seed)
+    # random.seed(seed)
 
     # load hyper parameters
     with open(args.hpy) as f:
@@ -109,7 +109,7 @@ def main(args):
                                         cache=args.cache_data,
                                         past_steps=cfg["contrast_sequence_length"],
                                         future_steps=args.time_step,
-                                        train=True,
+                                        train=False,
                                         temp_dim=cfg["Temporal_dim"])
     dataset_val = Diffusion_multi_env(data_folder_path=args.val_path,
                                       cache=args.cache_data,
@@ -127,8 +127,7 @@ def main(args):
     # dataloader
     print("Diffusion model dataloader generating...")
     nw = min([os.cpu_count(), args.batch_size if args.batch_size > 1 else 0, 8])  # number of workers
-    if args.rank in [-1, 0]:
-        print(f"Using {nw} dataloader workers every process")
+    print(f"Using {nw} dataloader workers every process")
     data_loader_train = torch.utils.data.DataLoader(dataset_train, batch_sampler=batch_sampler_train, 
                                                     collate_fn=dataset_train.collate_fn , num_workers=nw)
     data_loader_val = torch.utils.data.DataLoader(dataset_val, batch_sampler=batch_sampler_val,
@@ -233,14 +232,22 @@ def main(args):
     start_time = time.time()
     
     # Training set evaluation
-    train_loss_dict = evaluate(encoder=encoder, model=diffusion_model,
-                                criterion=diffusion_util, data_loader=data_loader_val,
-                                device=device, scaler=scaler, repeat=cfg["diffusion_repeat"])
+    (train_history, train_hist_labels, 
+     train_future, train_future_labels, 
+     train_loss_dict) = evaluate(encoder=encoder, diff_model=diffusion_model, 
+                                 T2F_model=T2F_model, diff_criterion=diffusion_util, 
+                                 T2F_criterion=T2F_criterion, data_loader=data_loader_train, 
+                                 device=device, scaler=scaler)
+    # Visualize the results for training set
 
     # Testing set evaluation
-    val_loss_dict = evaluate(encoder=encoder, model=diffusion_model,
-                                criterion=diffusion_util, data_loader=data_loader_val,
-                                device=device, scaler=scaler, repeat=cfg["diffusion_repeat"])
+    (val_history, val_hist_labels, 
+     val_future, val_future_labels, 
+     val_loss_dict) = evaluate(encoder=encoder, diff_model=diffusion_model, 
+                               T2F_model=T2F_model, diff_criterion=diffusion_util, 
+                               T2F_criterion=T2F_criterion, data_loader=data_loader_val, 
+                               device=device, scaler=scaler)
+    # Visualize the results for testing set
     
     # write results
     log_stats = {**{f'train_{k}': v for k, v in train_loss_dict.items()},

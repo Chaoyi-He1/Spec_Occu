@@ -503,7 +503,7 @@ class Diffusion_multi_env(Dataset):
 
     def __len__(self):
         return len(self.label_dict) * 192 if self.train \
-            else len(self.label_dict) * 20
+            else len(self.label_dict) * 60
 
     def __getitem__(self, index):
         """
