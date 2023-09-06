@@ -42,7 +42,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
                                                       sample=1, bestof=False, step=10, flexibility=0.0, 
                                                       model=diff_model, point_dim=future.shape[-1], 
                                                       ret_traj=False, sampling="ddpm")
-            predict_label = T2F_model(predict).detach()
+            predict_label = T2F_model(predict / 50).detach()
             BCELoss, acc_steps = T2F_criterion(predict_label, future_labels)
             acc = acc_steps.mean()
             F1score = F1_score(predict_label, future_labels)
