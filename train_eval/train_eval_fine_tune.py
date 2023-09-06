@@ -14,7 +14,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
                     T2F_model: torch.nn.Module, diff_criterion: Diffusion_utils, 
                     T2F_criterion: Temporal_Freq_Loss, data_loader: Iterable, 
                     optimizer: torch.optim.Optimizer, device: torch.device, 
-                    epoch: int, max_norm: float = 0.001, scaler=None, 
+                    epoch: int, max_norm: float = 0.1, scaler=None, 
                     freeze_encoder: bool =False):
     encoder.train()
     diff_model.train()
