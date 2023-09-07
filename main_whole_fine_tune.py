@@ -220,9 +220,9 @@ def main(args):
         print("Loading diffusion model from: ", args.diffusion_path)
         ckpt = torch.load(args.diffusion_path, map_location='cpu')
         try:
-            ckpt["diffusion_model"] = {k: ckpt["model"][k] 
+            ckpt["diffusion_model"] = {k: ckpt["diffusion_model"][k] 
                                        for k, v in diffusion_model.state_dict().items()
-                                       if ckpt["model"][k].numel() == v.numel()}
+                                       if ckpt["diffusion_model"][k].numel() == v.numel()}
             diffusion_model.load_state_dict(ckpt["diffusion_model"], strict=False)
         except KeyError as e:
             s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
