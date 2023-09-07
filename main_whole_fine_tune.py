@@ -50,7 +50,7 @@ def get_args_parser():
     parser.add_argument('--positional-embedding', default='learned', choices=('sine', 'learned'),
                         help="type of positional embedding to use on top of the image features")
     parser.add_argument('--sync-bn', action='store_true', help='enabling apex sync BN.')
-    parser.add_argument('--freeze-encoder', type=bool, default=True, help="freeze the encoder")
+    parser.add_argument('--freeze-encoder', action='store_true', help="freeze the encoder")
     parser.add_argument('--freeze-diffusion', action='store_true', help="freeze the diffusion model")
     parser.add_argument('--save-best', action='store_true', help="save best model")
 
