@@ -44,7 +44,7 @@ def get_args_parser():
     parser.add_argument('--resume', type=str, default='weights/fine_tune/', help="initial weights path")  # weights/model_940.pth
     parser.add_argument('--encoder-path', type=str, default='weights/contrast/model_1553.pth', help="encoder path")
     parser.add_argument('--T2F-path', type=str, default='weights/T2F/conv/model_449.pth', help="T2F path")
-    parser.add_argument('--diffusion-path', type=str, default='weights/diffusioni/model_052.pth', help="diffusion path")
+    parser.add_argument('--diffusion-path', type=str, default='weights/diffusion/model_052.pth', help="diffusion path")
     parser.add_argument('--time-step', type=int, default=32, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
     parser.add_argument('--positional-embedding', default='learned', choices=('sine', 'learned'),
@@ -220,10 +220,10 @@ def main(args):
         print("Loading diffusion model from: ", args.diffusion_path)
         ckpt = torch.load(args.diffusion_path, map_location='cpu')
         try:
-            ckpt["model"] = {k: ckpt["model"][k] 
-                               for k, v in diffusion_model.state_dict().items()
-                               if ckpt["model"][k].numel() == v.numel()}
-            diffusion_model.load_state_dict(ckpt["model"], strict=False)
+            ckpt["diffusion_model"] = {k: ckpt["model"][k] 
+                                       for k, v in diffusion_model.state_dict().items()
+                                       if ckpt["model"][k].numel() == v.numel()}
+            diffusion_model.load_state_dict(ckpt["diffusion_model"], strict=False)
         except KeyError as e:
             s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
                 % (args.weights, args.hyp, args.weights)
