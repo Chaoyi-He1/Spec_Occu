@@ -42,7 +42,7 @@ def get_args_parser():
 
     # Model parameters
     parser.add_argument('--resume', type=str, default='weights/fine_tune/', help="initial weights path")  # weights/model_940.pth
-    parser.add_argument('--encoder-path', type=str, default='weights/contrast/model_1553.pth', help="encoder path")
+    parser.add_argument('--encoder-path', type=str, default='', help="encoder path")
     parser.add_argument('--T2F-path', type=str, default='weights/T2F/conv/model_449.pth', help="T2F path")
     parser.add_argument('--diffusion-path', type=str, default='weights/diffusion/model_052.pth', help="diffusion path")
     parser.add_argument('--time-step', type=int, default=32, help="number of time steps to predict")
