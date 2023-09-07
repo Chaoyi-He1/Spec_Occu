@@ -38,13 +38,13 @@ def get_args_parser():
     parser.add_argument('--eval', action='store_true', help='only evaluate model on validation set')
 
     # Model parameters
-    parser.add_argument('--resume', type=str, default='weights/contrast/model_0926.pth', help="initial weights path")  # weights/model_940.pth
+    parser.add_argument('--resume', type=str, default='', help="initial weights path")  # weights/model_940.pth
     parser.add_argument('--time-step', type=int, default=12, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
     parser.add_argument('--positional-embedding', default='sine', choices=('sine', 'learned'),
                         help="type of positional embedding to use on top of the image features")
     parser.add_argument('--sync-bn', action='store_true', help='enabling apex sync BN.')
-    parser.add_argument('--freeze-encoder', default=True, help="freeze the encoder")
+    parser.add_argument('--freeze-encoder', default=False, help="freeze the encoder")
     parser.add_argument('--save-best', action='store_true', help="save best model")
 
     # Optimization parameters
@@ -57,8 +57,8 @@ def get_args_parser():
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
     # dataset parameters
-    parser.add_argument('--train-path', default='path/train/', help='train dataset path')
-    parser.add_argument('--val-path', default='path/val/', help='val dataset path')
+    parser.add_argument('--train-path', default='path/Data_files_with_label/train/', help='train dataset path')
+    parser.add_argument('--val-path', default='path/Data_files_with_label/val/', help='val dataset path')
     parser.add_argument('--cache-data', default=True, type=bool, help='cache data for faster training')
     parser.add_argument('--train-split', default=0.8, type=float, help='train split')
     parser.add_argument('--output-dir', default='weights/contrast', help='path where to save, empty for no saving')
