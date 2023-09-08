@@ -9,13 +9,13 @@ from scipy.stats import multivariate_normal
 
 
 def plot_predictions(ax, fig,
-                     prediction_temporal,
+                     prediction_prob,
                      futures_label,
                      kde=False):
-    r, b, l, d = prediction_temporal.shape
+    b, l, d = prediction_prob.shape
     if kde:
         # Create a mesh grid for the (l, c) coordinates
-        data = prediction_temporal.sum(axis=0).squeeze().detach().cpu().numpy()
+        data = prediction_prob.detach().cpu().numpy()
 
         # Flatten the (l, c) coordinates and data for KDE
         values = data.ravel()
@@ -39,7 +39,7 @@ def plot_predictions(ax, fig,
         
     
     # Create a scatter plot with the 'Blues' colormap
-    data = prediction_temporal.sum(axis=0).squeeze().detach().cpu().numpy()
+    data = prediction_prob.detach().cpu().numpy()
     flat_data = data.flatten()
     scatter = ax.scatter(
         np.tile(np.arange(d), l),  # X-axis values

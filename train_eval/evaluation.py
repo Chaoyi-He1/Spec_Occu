@@ -8,6 +8,7 @@ from util.Temp_to_Freq import F1_score
 import torch.nn.functional as F
 from util.diffusion import Diffusion_utils
 from util.Temp_to_Freq import Temporal_Freq_Loss, F1_score
+from eval_visual.visualization import *
 
 
 def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module, 
@@ -56,7 +57,10 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         metric_logger.update(loss=torch.stack(BCELoss).mean().item(), 
                              acc=acc.item(), acc_steps=acc_steps.item(),
                              F1_score=F1score.mean().item())
-    
+    # Visualize the best prediction
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    plot_predictions(ax, fig, predict_probs, future_labels)
     return best_history, best_hist_labels, best_future, best_future_labels, \
            {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
