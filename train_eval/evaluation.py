@@ -41,10 +41,10 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         with torch.no_grad(), torch.cuda.amp.autocast(enabled=scaler is not None):
             features = encoder(history)
             predicts = diff_criterion.sample(num_points=future.shape[1], context=features,
-                                            sample=20, bestof=False, step=1, flexibility=0.0, 
+                                            sample=20, bestof=False, step=10, flexibility=0.0, 
                                             model=diff_model, point_dim=future.shape[-1], 
                                             ret_traj=False, sampling="ddpm") / 50
-            predicts -= predicts.mean(dim=-1, keepdim=True)
+            # predicts -= predicts.mean(dim=-1, keepdim=True)
             predict_labels = [T2F_model(predict) for predict in predicts]
             acc_steps, acc, F1score, predict_probs = calculate_prob_cloud(predict_labels, future_labels)
             BCELoss, _ = zip(*[T2F_criterion(predict_label, future_labels) for predict_label in predict_labels])
