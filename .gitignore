@@ -14,3 +14,4 @@ job.slurm
 output.log
 *.txt
 *.swp
+*.jpg
