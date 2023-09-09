@@ -40,7 +40,7 @@ def plot_predictions(ax, fig,
     
     # Create a scatter plot with the 'Blues' colormap
     data = prediction_prob.detach().cpu().numpy()
-    flat_data = data.flatten()
+    flat_data = data[0].flatten()
     scatter = ax.scatter(
         np.tile(np.arange(d), l),  # X-axis values
         np.repeat(np.arange(l), d),  # Y-axis values
