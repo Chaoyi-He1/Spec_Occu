@@ -43,7 +43,7 @@ def get_args_parser():
     # Model parameters
     parser.add_argument('--resume', type=str, default='weights/fine_tune/model_062.pth', help="initial weights path")  # weights/model_940.pth
     parser.add_argument('--encoder-path', type=str, default='', help="encoder path")
-    parser.add_argument('--T2F-path', type=str, default='weights/T2F/conv/', help="T2F path")
+    parser.add_argument('--T2F-path', type=str, default='weights/T2F/conv/model_449.pth', help="T2F path")
     parser.add_argument('--diffusion-path', type=str, default='weights/diffusioni/', help="diffusion path")
     parser.add_argument('--time-step', type=int, default=32, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
@@ -170,10 +170,6 @@ def main(args):
             ckpt["encoder"] = {k: v for k, v in ckpt["encoder"].items()
                                if encoder.state_dict()[k].numel() == v.numel()}
             encoder.load_state_dict(ckpt["encoder"], strict=False)
-            
-            ckpt["T2F_model"] = {k: v for k, v in ckpt["T2F_model"].items()
-                                 if T2F_model.state_dict()[k].numel() == v.numel()}
-            T2F_model.load_state_dict(ckpt["T2F_model"], strict=False)
             
             ckpt["diffusion_util"] = {k: v for k, v in ckpt["diffusion_util"].items()
                                       if diffusion_util.state_dict()[k].numel() == v.numel()}
