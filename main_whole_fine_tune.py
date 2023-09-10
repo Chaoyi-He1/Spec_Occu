@@ -52,6 +52,7 @@ def get_args_parser():
     parser.add_argument('--sync-bn', action='store_true', help='enabling apex sync BN.')
     parser.add_argument('--freeze-encoder', action='store_true', help="freeze the encoder")
     parser.add_argument('--freeze-diffusion', action='store_true', help="freeze the diffusion model")
+    parser.add_argument('--freeze-T2F', action='store_true', help="freeze the T2F model")
     parser.add_argument('--save-best', action='store_true', help="save best model")
 
     # Optimization parameters
@@ -289,6 +290,12 @@ def main(args):
         encoder_without_ddp = encoder.module if isinstance(encoder, 
                                                            torch.nn.parallel.DistributedDataParallel) \
                               else encoder
+        
+        if not args.freeze_T2F:
+            T2F_model = torch.nn.parallel.DistributedDataParallel(T2F_model, device_ids=[args.gpu])
+        T2F_model_without_ddp = T2F_model.module if isinstance(T2F_model,
+                                                               torch.nn.parallel.DistributedDataParallel) \
+                                  else T2F_model
     
     # # add graph to tensorboard
     # if args.rank in [-1, 0]:
@@ -395,9 +402,12 @@ def main(args):
                     "epoch": epoch,
                     "diffusion_model": diffusion_model_without_ddp.state_dict() if args.distributed 
                                        else diffusion_model.state_dict(),
-                    "encoder": encoder_without_ddp.state_dict() if args.distributed else encoder.state_dict(),
+                    "encoder": encoder_without_ddp.state_dict() if not args.freeze_encoder 
+                               else encoder.state_dict(),
                     "diffusion_util": diffusion_util.state_dict() if args.distributed
                                       else diffusion_util.state_dict(),
+                    "T2F_model": T2F_model_without_ddp.state_dict() if not args.freeze_T2F
+                                 else T2F_model.state_dict(),
                     "optimizer": optimizer.state_dict(),
                     "scaler": scaler.state_dict() if scaler is not None else None,
                     "lr_scheduler": scheduler.state_dict(),

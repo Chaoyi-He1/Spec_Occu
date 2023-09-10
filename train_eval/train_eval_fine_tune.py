@@ -13,9 +13,9 @@ from util.Temp_to_Freq import Temporal_Freq_Loss, F1_score
 def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module, 
                     T2F_model: torch.nn.Module, diff_criterion: Diffusion_utils, 
                     T2F_criterion: Temporal_Freq_Loss, data_loader: Iterable, 
-                    optimizer: torch.optim.Optimizer, device: torch.device, 
-                    epoch: int, max_norm: float = 0.1, scaler=None, 
-                    freeze_encoder: bool =False):
+                    diff_optimizer: torch.optim.Optimizer, T2F_optimizer: torch.optim.Optimizer,
+                    device: torch.device, epoch: int, max_norm: float = 0.1, 
+                    scaler=None, freeze_encoder: bool =False):
     encoder.train()
     diff_model.train()
     T2F_model.eval()
@@ -62,7 +62,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         acc_reduced = reduce_loss(acc)
 
         # Backward
-        optimizer.zero_grad()
+        diff_optimizer.zero_grad()
         if scaler is not None:
             scaler.scale(loss).backward()
         else:
@@ -74,10 +74,10 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             torch.nn.utils.clip_grad_norm_(params, max_norm)
         
         if scaler is not None:
-            scaler.step(optimizer)
+            scaler.step(diff_optimizer)
             scaler.update()
         else:
-            optimizer.step()
+            diff_optimizer.step()
             
         # params_updated = {name: param.clone() for name, param in model.named_parameters()}
         # for name, initial_param in initial_params.items():
@@ -90,7 +90,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         
         # Update metric
         metric_logger.update(loss=loss_reduced.item())
-        metric_logger.update(lr=optimizer.param_groups[0]["lr"])
+        metric_logger.update(lr=diff_optimizer.param_groups[0]["lr"])
         metric_logger.update(acc=acc_reduced.item())
         metric_logger.update(F1_score=torch.stack(F1score).mean().item())
 
