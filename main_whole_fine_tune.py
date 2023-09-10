@@ -41,10 +41,10 @@ def get_args_parser():
     parser.add_argument('--eval', action='store_true', help='only evaluate model on validation set')
 
     # Model parameters
-    parser.add_argument('--resume', type=str, default='weights/fine_tune/', help="initial weights path")  # weights/model_940.pth
+    parser.add_argument('--resume', type=str, default='weights/fine_tune/model_130.pth', help="initial weights path")  # weights/model_940.pth
     parser.add_argument('--encoder-path', type=str, default='', help="encoder path")
     parser.add_argument('--T2F-path', type=str, default='weights/T2F/conv/model_449.pth', help="T2F path")
-    parser.add_argument('--diffusion-path', type=str, default='weights/diffusion/model_153.pth', help="diffusion path")
+    parser.add_argument('--diffusion-path', type=str, default='weights/diffusion/', help="diffusion path")
     parser.add_argument('--time-step', type=int, default=32, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
     parser.add_argument('--positional-embedding', default='learned', choices=('sine', 'learned'),
@@ -270,9 +270,10 @@ def main(args):
                 param.requires_grad = False
         print("Encoder frozen.")
     
-    for param in T2F_model.parameters():
-        param.requires_grad = False
-    print("T2F model frozen.")
+    if args.freeze_T2F:
+        for param in T2F_model.parameters():
+            param.requires_grad = False
+        print("T2F model frozen.")
     
     # synchronize batch norm layers if args.sync_bn is true
     if args.sync_bn:
@@ -329,11 +330,21 @@ def main(args):
     print('Encoder Model Summary: %g layers, %g parameters' %
           (layers, n_parameters))
     
+    params_to_optimize_T2F = []
+    n_parameters, layers = 0, 0
+    for p in T2F_model.parameters():
+        n_parameters += p.numel()
+        layers += 1
+        if p.requires_grad:
+            params_to_optimize_T2F.append(p)
+    
     # learning rate scheduler setting
     args.lr *= max(1., args.world_size * args.batch_size / 64)
-    optimizer = torch.optim.AdamW(params_to_optimize, lr=args.lr, weight_decay=args.weight_decay)
+    diff_optimizer = torch.optim.AdamW(params_to_optimize, lr=args.lr, weight_decay=args.weight_decay)
+    T2F_optimizer = torch.optim.AdamW(params_to_optimize_T2F, lr=args.lr, weight_decay=args.weight_decay) \
+                    if not args.freeze_T2F else None
     lf = lambda x: ((1 + math.cos(x * math.pi / args.epochs)) / 2) * (1 - args.lrf) + args.lrf  # cosine
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
+    scheduler = torch.optim.lr_scheduler.LambdaLR([diff_optimizer, T2F_optimizer], lr_lambda=lf)
     scheduler.last_epoch = start_epoch  # do not move
 
     # start training
@@ -348,8 +359,9 @@ def main(args):
         # train
         train_loss_dict = train_one_epoch(encoder=encoder, diff_model=diffusion_model, T2F_model=T2F_model,
                                           diff_criterion=diffusion_util, T2F_criterion=T2F_criterion,
-                                          data_loader=data_loader_train, optimizer=optimizer, 
-                                          epoch=epoch, scaler=scaler, device=device, freeze_encoder=args.freeze_encoder)
+                                          data_loader=data_loader_train, diff_optimizer=diff_optimizer, 
+                                          T2F_optimizer=T2F_optimizer, epoch=epoch, scaler=scaler, device=device, 
+                                          freeze_encoder=args.freeze_encoder)
         scheduler.step()
 
         # evaluate
