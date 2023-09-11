@@ -344,8 +344,12 @@ def main(args):
     T2F_optimizer = torch.optim.AdamW(params_to_optimize_T2F, lr=args.lr, weight_decay=args.weight_decay) \
                     if not args.freeze_T2F else None
     lf = lambda x: ((1 + math.cos(x * math.pi / args.epochs)) / 2) * (1 - args.lrf) + args.lrf  # cosine
-    scheduler = torch.optim.lr_scheduler.LambdaLR([diff_optimizer, T2F_optimizer], lr_lambda=lf)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(diff_optimizer, lr_lambda=lf)
+    scheduler_T2F = torch.optim.lr_scheduler.LambdaLR(T2F_optimizer, lr_lambda=lf) \
+                    if not args.freeze_T2F else None
     scheduler.last_epoch = start_epoch  # do not move
+    if not args.freeze_T2F:
+        scheduler_T2F.last_epoch = start_epoch  # do not move
 
     # start training
     print("Start training...")
@@ -363,6 +367,8 @@ def main(args):
                                           T2F_optimizer=T2F_optimizer, epoch=epoch, scaler=scaler, device=device, 
                                           freeze_encoder=args.freeze_encoder)
         scheduler.step()
+        if not args.freeze_T2F:
+            scheduler_T2F.step()
 
         # evaluate
         test_loss_dict = evaluate(encoder=encoder, model=diffusion_model,
@@ -399,11 +405,14 @@ def main(args):
                     "epoch": epoch,
                     "diffusion_model": diffusion_model_without_ddp.state_dict() if args.distributed 
                                        else diffusion_model.state_dict(),
-                    "encoder": encoder_without_ddp.state_dict() if args.distributed else encoder.state_dict(),
+                    "encoder": encoder_without_ddp.state_dict() if not args.freeze_encoder 
+                               else encoder.state_dict(),
                     "diffusion_util": diffusion_util.state_dict() if args.distributed
                                       else diffusion_util.state_dict(),
-                    "T2F_model": T2F_model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
+                    "T2F_model": T2F_model_without_ddp.state_dict() if not args.freeze_T2F
+                                 else T2F_model.state_dict(),
+                    "optimizer": diff_optimizer.state_dict(),
+                    "T2F_optimizer": T2F_optimizer.state_dict() if not args.freeze_T2F else None,
                     "scaler": scaler.state_dict() if scaler is not None else None,
                     "lr_scheduler": scheduler.state_dict(),
                 }, best)
@@ -420,7 +429,8 @@ def main(args):
                                       else diffusion_util.state_dict(),
                     "T2F_model": T2F_model_without_ddp.state_dict() if not args.freeze_T2F
                                  else T2F_model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
+                    "optimizer": diff_optimizer.state_dict(),
+                    "T2F_optimizer": T2F_optimizer.state_dict() if not args.freeze_T2F else None,
                     "scaler": scaler.state_dict() if scaler is not None else None,
                     "lr_scheduler": scheduler.state_dict(),
                 }, os.path.join(args.output_dir, 'model_{}.pth'.format(str(epoch).zfill(digits))))
