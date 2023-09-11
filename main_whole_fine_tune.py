@@ -56,7 +56,7 @@ def get_args_parser():
     parser.add_argument('--save-best', action='store_true', help="save best model")
 
     # Optimization parameters
-    parser.add_argument('--lr', default=1e-4, type=float)
+    parser.add_argument('--lr', default=1e-5, type=float)
     parser.add_argument('--lrf', default=0.01, type=float)
     parser.add_argument('--weight_decay', default=0.0, type=float)
     parser.add_argument('--epochs', default=300, type=int)
@@ -274,6 +274,9 @@ def main(args):
         for param in T2F_model.parameters():
             param.requires_grad = False
         print("T2F model frozen.")
+    for name, param in T2F_model.named_parameters():
+        if "ResNet" in name:
+            param.requires_grad = False
     
     # synchronize batch norm layers if args.sync_bn is true
     if args.sync_bn:

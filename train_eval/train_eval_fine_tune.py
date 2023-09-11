@@ -18,7 +18,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
                     scaler=None, freeze_encoder: bool =False):
     encoder.train()
     diff_model.train()
-    T2F_model.eval()
+    T2F_model.train()
     diff_criterion.train()
     T2F_criterion.train()
     metric_logger = MetricLogger(delimiter="; ")
@@ -66,13 +66,15 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         with torch.cuda.amp.autocast(enabled=scaler is not None), torch.no_grad():
             features = encoder(history)
             predict = diff_criterion.sample(num_points=future.shape[1], context=features, 
-                                            sample=20, bestof=False, step=10,
+                                            sample=1, bestof=False, step=10,
                                             model=diff_model, point_dim=future.shape[-1], 
                                             flexibility=0.0, ret_traj=False, sampling="ddpm")
-            predict = predict.mean(dim=0) / 50.0
+            predict = predict[0].detach() / 50.0
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             predict_label = T2F_model(predict)
+            print(torch.isnan(predict_label).any())
             loss_T2F, acc_steps = T2F_criterion(predict_label, future_labels)
+            print(loss_T2F.item())
             acc = acc_steps.mean()
             F1score = F1_score(predict_label, future_labels)
             
@@ -92,7 +94,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             loss_T2F.backward()
         
         if max_norm > 0:
-            torch.nn.utils.clip_grad_norm_(T2F_model.parameters, max_norm)
+            torch.nn.utils.clip_grad_norm_(T2F_model.parameters(), max_norm)
         
         if scaler is not None:
             scaler.step(T2F_optimizer)
