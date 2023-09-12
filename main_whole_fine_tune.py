@@ -274,9 +274,9 @@ def main(args):
         for param in T2F_model.parameters():
             param.requires_grad = False
         print("T2F model frozen.")
-    for name, param in T2F_model.named_parameters():
-        if "ResNet" in name:
-            param.requires_grad = False
+    # for name, param in T2F_model.named_parameters():
+    #     if "ResNet" in name:
+    #         param.requires_grad = False
     
     # synchronize batch norm layers if args.sync_bn is true
     if args.sync_bn:
@@ -343,8 +343,8 @@ def main(args):
     
     # learning rate scheduler setting
     args.lr *= max(1., args.world_size * args.batch_size / 64)
-    diff_optimizer = torch.optim.AdamW(params_to_optimize, lr=args.lr, weight_decay=args.weight_decay)
-    T2F_optimizer = torch.optim.AdamW(params_to_optimize_T2F, lr=args.lr, weight_decay=args.weight_decay) \
+    diff_optimizer = torch.optim.Adam(params_to_optimize, lr=args.lr, weight_decay=args.weight_decay)
+    T2F_optimizer = torch.optim.Adam(params_to_optimize_T2F, lr=args.lr, weight_decay=args.weight_decay) \
                     if not args.freeze_T2F else None
     lf = lambda x: ((1 + math.cos(x * math.pi / args.epochs)) / 2) * (1 - args.lrf) + args.lrf  # cosine
     scheduler = torch.optim.lr_scheduler.LambdaLR(diff_optimizer, lr_lambda=lf)

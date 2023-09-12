@@ -14,7 +14,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
                     T2F_model: torch.nn.Module, diff_criterion: Diffusion_utils, 
                     T2F_criterion: Temporal_Freq_Loss, data_loader: Iterable, 
                     diff_optimizer: torch.optim.Optimizer, T2F_optimizer: torch.optim.Optimizer,
-                    device: torch.device, epoch: int, max_norm: float = 0.1, 
+                    device: torch.device, epoch: int, max_norm: float = 0.01, 
                     scaler=None, freeze_encoder: bool =False):
     encoder.train()
     diff_model.train()
@@ -30,7 +30,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     
     for _, (history, hist_labels,
             future, future_labels) in enumerate(metric_logger.log_every(data_loader, 10, header)):
-        torch.autograd.set_detect_anomaly(True)
+        # torch.autograd.set_detect_anomaly(True)
         history = history.to(device)
         future = future.to(device)
         future_labels = future_labels.to(device)
@@ -39,7 +39,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             features = encoder(history)
             BCELoss = diff_criterion.get_loss_fine_tune(x_0=future, context=features, model=diff_model)
         
-        loss = BCELoss.mean()
+            loss = BCELoss.mean()
             # F1score = F1_score(predict_label, future_labels)
 
         if torch.isnan(loss):
@@ -56,12 +56,6 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             params = diff_model.parameters() if freeze_encoder \
                 else chain(encoder.parameters(), diff_model.parameters())
             torch.nn.utils.clip_grad_norm_(params, max_norm)
-        
-        if scaler is not None:
-            scaler.step(diff_optimizer)
-            scaler.update()
-        else:
-            diff_optimizer.step()
         
         with torch.cuda.amp.autocast(enabled=scaler is not None), torch.no_grad():
             features = encoder(history)
@@ -95,11 +89,13 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         
         if max_norm > 0:
             torch.nn.utils.clip_grad_norm_(T2F_model.parameters(), max_norm)
-        
+            
         if scaler is not None:
+            scaler.step(diff_optimizer)
             scaler.step(T2F_optimizer)
             scaler.update()
         else:
+            diff_optimizer.step()
             T2F_optimizer.step()
         # torch.autograd.set_detect_anomaly(False)
         
