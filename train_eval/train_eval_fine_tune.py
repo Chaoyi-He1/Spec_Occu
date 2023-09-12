@@ -66,9 +66,9 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             predict = predict[0].detach() / 50.0
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             predict_label = T2F_model(predict)
-            print(torch.isnan(predict_label).any())
+            # print(torch.isnan(predict_label).any())
             loss_T2F, acc_steps = T2F_criterion(predict_label, future_labels)
-            print(loss_T2F.item())
+            # print(loss_T2F.item())
             acc = acc_steps.mean()
             F1score = F1_score(predict_label, future_labels)
             
