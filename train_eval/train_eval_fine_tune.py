@@ -22,10 +22,10 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     diff_criterion.train()
     T2F_criterion.train()
     metric_logger = MetricLogger(delimiter="; ")
-    metric_logger.add_meter('loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    metric_logger.add_meter('lr', SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    metric_logger.add_meter('acc', SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    metric_logger.add_meter('F1_score', SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter('loss', SmoothedValue(window_size=10, fmt='{value:.6f}'))
+    metric_logger.add_meter('lr', SmoothedValue(window_size=10, fmt='{value:.6f}'))
+    metric_logger.add_meter('acc', SmoothedValue(window_size=10, fmt='{value:.6f}'))
+    metric_logger.add_meter('F1_score', SmoothedValue(window_size=10, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
     
     for _, (history, hist_labels,
