@@ -21,14 +21,15 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     diff_criterion.eval()
     T2F_criterion.eval()
     metric_logger = MetricLogger(delimiter="; ")
-    metric_logger.add_meter('loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    metric_logger.add_meter('acc', SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter('loss', SmoothedValue(window_size=10, fmt='{value:.6f}'))
+    metric_logger.add_meter('acc', SmoothedValue(window_size=10, fmt='{value:.6f}'))
     # metric_logger.add_meter('acc_steps', SmoothedValue(window_size=1, fmt='{value:.6f}'))
-    metric_logger.add_meter('F1_score', SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    metric_logger.add_meter('F1_score', SmoothedValue(window_size=10, fmt='{value:.6f}'))
     header = 'Test:'
     
     best_history, best_hist_labels, best_future, best_future_labels = None, None, None, None
     best_acc, best_F1score = 0, 0
+    acc, F1 = [], []
     
     for _, (history, hist_labels,
             future, future_labels) in enumerate(metric_logger.log_every(data_loader, 10, header)):
@@ -49,7 +50,8 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             acc_steps, acc, F1score, predict_probs = calculate_prob_cloud(predict_labels, future_labels)
             BCELoss, _ = zip(*[T2F_criterion(predict_label, future_labels) for predict_label in predict_labels])
             
-        
+        acc.append(acc.item())
+        F1.append(F1score.mean().item())
         if F1score.mean() > best_F1score and acc > best_acc:
             best_history, best_hist_labels, best_future, best_future_labels = history, hist_labels, future, future_labels
             best_acc, best_F1score = acc, F1score.mean()
@@ -62,6 +64,8 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     fig = plt.figure()
     ax = fig.add_subplot(111)
     plot_predictions(ax, fig, predict_probs, future_labels)
+    print("average acc: ", sum(acc) / len(acc))
+    print("average F1 score: ", sum(F1) / len(F1))
     return best_history, best_hist_labels, best_future, best_future_labels, \
            {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
