@@ -45,7 +45,7 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
                                             sample=10, bestof=False, step=10, flexibility=0.0, 
                                             model=diff_model, point_dim=future.shape[-1], 
                                             ret_traj=False, sampling="ddpm") / 50
-            predicts -= predicts.mean(dim=-1, keepdim=True)
+            # predicts -= predicts.mean(dim=-1, keepdim=True)
             predict_labels = [T2F_model(predict) for predict in predicts]
             acc_steps, acc, F1score, predict_probs = calculate_prob_cloud(predict_labels, future_labels)
             BCELoss, _ = zip(*[T2F_criterion(predict_label, future_labels) for predict_label in predict_labels])
@@ -71,17 +71,15 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
 
 
 def calculate_prob_cloud(predict_labels: List[Tensor], future_labels: Tensor, 
-                         threshold: float = 0.8):
-    predict_labels = torch.sigmoid(torch.stack(predict_labels)).round()
-    if predict_labels.min() == 0:
-        print("Warning: The minimum value of predict_labels is 0.")
+                         threshold: float = 0.5):
+    predict_labels = torch.stack(predict_labels)
+    predict_labels[predict_labels < threshold] = 0
+    predict_labels[predict_labels >= threshold] = 1
+
     sample_size, batch_size, num_time_steps, num_classes = predict_labels.shape
     predict_probs = predict_labels.sum(dim=0) / sample_size
-    predict_labels = predict_probs.clone()
-    predict_labels[predict_probs < threshold] = 0
-    predict_labels[predict_probs >= threshold] = 1
-    if predict_labels.min() == 0:
-        print("Test: The minimum value of predict_labels is 0.")
+    predict_labels = predict_probs.round()
+
     
     # calculate the accuracy and F1 score
     acc_steps = (predict_labels == future_labels).sum(dim=2).sum(dim=0) / (batch_size * num_classes)
