@@ -29,7 +29,7 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     
     best_history, best_hist_labels, best_future, best_future_labels = None, None, None, None
     best_acc, best_F1score = 0, 0
-    acc, F1 = [], []
+    acc_batch, F1 = [], []
     
     for _, (history, hist_labels,
             future, future_labels) in enumerate(metric_logger.log_every(data_loader, 10, header)):
@@ -50,7 +50,7 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             acc_steps, acc, F1score, predict_probs = calculate_prob_cloud(predict_labels, future_labels)
             BCELoss, _ = zip(*[T2F_criterion(predict_label, future_labels) for predict_label in predict_labels])
             
-        acc.append(acc.item())
+        acc_batch.append(acc.item())
         F1.append(F1score.mean().item())
         if F1score.mean() > best_F1score and acc > best_acc:
             best_history, best_hist_labels, best_future, best_future_labels = history, hist_labels, future, future_labels
@@ -64,7 +64,7 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     fig = plt.figure()
     ax = fig.add_subplot(111)
     plot_predictions(ax, fig, predict_probs, future_labels)
-    print("average acc: ", sum(acc) / len(acc))
+    print("average acc: ", sum(acc_batch) / len(acc_batch))
     print("average F1 score: ", sum(F1) / len(F1))
     return best_history, best_hist_labels, best_future, best_future_labels, \
            {k: meter.global_avg for k, meter in metric_logger.meters.items()}
