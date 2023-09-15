@@ -9,18 +9,18 @@ from typing import List
 class Steps_BCELoss(nn.Module):
     def __init__(self):
         super(Steps_BCELoss, self).__init__()
-        self.bce = nn.BCEWithLogitsLoss(reduction="mean")
+        self.bce = nn.BCEWithLogitsLoss(reduction="none")
     
     def forward(self, pred: Tensor, targets: Tensor):
         _, l, _ = targets.shape
         device = targets.device
-        targets = 2 * targets - 1
+        pos_weight = targets == 0
         # loss_steps = []
         # for i in range(l):
         #     loss_steps.append(self.bce(pred[:, i, :], targets[:, i, :]))
         # loss_steps = torch.as_tensor(loss_steps).to(device)
-        loss = self.bce(pred, targets)
-        return loss
+        loss = self.bce(pred, targets) * pos_weight
+        return loss.mean()
 
 
 class Temporal_Freq_Loss(nn.Module):
