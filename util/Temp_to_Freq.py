@@ -14,6 +14,7 @@ class Steps_BCELoss(nn.Module):
     def forward(self, pred: Tensor, targets: Tensor):
         _, l, _ = targets.shape
         device = targets.device
+        targets = 2 * targets - 1
         # loss_steps = []
         # for i in range(l):
         #     loss_steps.append(self.bce(pred[:, i, :], targets[:, i, :]))
