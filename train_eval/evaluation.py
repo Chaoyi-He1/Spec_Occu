@@ -71,7 +71,7 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
 
 
 def calculate_prob_cloud(predict_labels: List[Tensor], future_labels: Tensor, 
-                         threshold: float = 0.5):
+                         threshold: float = 0.2):
     predict_labels = torch.stack(predict_labels)
     predict_labels[predict_labels < threshold] = 0
     predict_labels[predict_labels >= threshold] = 1
