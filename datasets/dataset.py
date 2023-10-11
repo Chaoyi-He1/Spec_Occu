@@ -550,7 +550,7 @@ class CPC_multi_env_test(Dataset):
     def __init__(self, data_folder_path: str = "", cache: bool = True,
                  past_steps: int = 32, future_steps: int = 12, train: bool = True,
                  temp_dim: int = 1024) -> None:
-        super(Diffusion_multi_env, self).__init__()
+        super(CPC_multi_env_test, self).__init__()
         assert os.path.isdir(data_folder_path), "path '{}' does not exist.".format(data_folder_path)
         self.data_files = [os.path.join(data_folder_path, f) for f in os.listdir(data_folder_path)]
         self.data_files.sort()
