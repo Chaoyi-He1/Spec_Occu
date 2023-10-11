@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from util.diffusion import Diffusion_utils
 from util.Temp_to_Freq import Temporal_Freq_Loss, F1_score
 from eval_visual.visualization import *
+from eval_visual.visual_CPC import *
 
 
 def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module, 
@@ -89,4 +90,32 @@ def calculate_prob_cloud(predict_labels: List[Tensor], future_labels: Tensor,
     fn = torch.logical_and(predict_labels == 0, future_labels == 1).sum(dim=2).sum(dim=0)
     F1scores = tp / (tp + 0.5 * (fp + fn))
     return acc_steps, acc, F1scores, predict_probs
+
+
+def CPC_test(encoder: torch.nn.Module, diff_model: torch.nn.Module, 
+             T2F_model: torch.nn.Module, diff_criterion: Diffusion_utils, 
+             T2F_criterion: Temporal_Freq_Loss, data_loader: Iterable, 
+             device: torch.device, scaler=None):
+    encoder.eval()
+    diff_model.eval()
+    T2F_model.eval()
+    diff_criterion.eval()
+    T2F_criterion.eval()
+    metric_logger = MetricLogger(delimiter="; ")
+    all_features, all_labels = [], []
     
+    for _, (history, _, _, _, index) in enumerate(metric_logger.log_every(data_loader, 10, header)):
+        torch.autograd.set_detect_anomaly(True)
+        history = history.to(device)
+        
+        # Compute the output
+        with torch.no_grad(), torch.cuda.amp.autocast(enabled=scaler is not None):
+            features = encoder(history)
+            all_features.append(features.detach().cpu().numpy())
+            all_labels.append(index.detach().cpu().numpy())
+            
+    print("Averaged stats:", metric_logger)
+    all_features = np.concatenate(all_features, axis=0)
+    all_labels = np.concatenate(all_labels, axis=0)
+    t_SNE_CPC(all_features, all_labels)
+    return all_features, all_labels
