@@ -103,6 +103,7 @@ def CPC_test(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     T2F_criterion.eval()
     metric_logger = MetricLogger(delimiter="; ")
     all_features, all_labels = [], []
+    header = 'Test:'
     
     for _, (history, _, _, _, index) in enumerate(metric_logger.log_every(data_loader, 10, header)):
         torch.autograd.set_detect_anomaly(True)

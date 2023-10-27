@@ -266,6 +266,11 @@ def main(args):
     start_time = time.time()
     
     # Training set evaluation
+    (all_features, all_labels) = CPC_test(encoder=encoder, diff_model=diffusion_model, 
+                                          T2F_model=T2F_model, diff_criterion=diffusion_util, 
+                                          T2F_criterion=T2F_criterion, data_loader=data_loader_train, 
+                                          device=device, scaler=scaler)
+    
     (train_history, train_hist_labels, 
      train_future, train_future_labels, 
      train_loss_dict) = evaluate(encoder=encoder, diff_model=diffusion_model, 
