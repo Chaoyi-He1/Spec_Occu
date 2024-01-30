@@ -435,6 +435,22 @@ class Encoder_Regressor(nn.Module):
                  pos_type: str = "sine", in_type: str = "1d") -> None:
         super(Encoder_Regressor, self).__init__()
         assert cfg is not None, "cfg should be a dict"
+        padding_input_proj = calculate_conv1d_padding(stride=31, kernel_size=127,
+                                                      d_in=cfg["Temporal_dim"], 
+                                                      d_out=cfg["feature_dim"])
+        self.input_residue_proj = nn.Sequential(
+            nn.Conv2d(in_channels=cfg["contrast_sequence_length"],
+                      out_channels=cfg["contrast_sequence_length"],
+                      kernel_size=(2, 1), stride=(1, 1), padding=(0, 0)),
+            nn.Flatten(start_dim=-2, end_dim=-1),
+            nn.Conv1d(in_channels=cfg["contrast_sequence_length"],
+                      out_channels=cfg["contrast_sequence_length"],
+                      kernel_size=127, stride=31, padding=padding_input_proj),
+            nn.Conv1d(in_channels=cfg["contrast_sequence_length"],
+                      out_channels=1,
+                      kernel_size=1, stride=1, padding=0),
+            nn.Flatten(start_dim=-2, end_dim=-1))
+        
         self.AutoEncoder_cfg = {
             "in_dim": (cfg["num_frames_per_clip"], cfg["Temporal_dim"]),
             "in_channel": cfg["in_channels"],
@@ -506,7 +522,7 @@ class Encoder_Regressor(nn.Module):
         # assert encoder_outputs.shape == (b, l, self.embed_dim), \
         #     "Encoder output shape should be [B, L, Embedding]"
 
-        feature = self.regressor(encoder_outputs)  # [B, feature_dim]
+        feature = self.regressor(encoder_outputs) + self.input_residue_proj(inputs)  # [B, feature_dim]
         # pred: [time_step, B, embed_dim, 1]
         pred = torch.matmul(self.linear_trans.unsqueeze(1), feature.unsqueeze(2))
         # assert pred.shape == (self.timestep, b, self.embed_dim, 1), \
