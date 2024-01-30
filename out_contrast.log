@@ -9,3 +9,4 @@ Namespace(amp=True, batch_size=5, cache_data=True, device='cuda', dist_backend='
 Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/
 0it [00:00, ?it/s]Contrastive dataset generating...
 0it [00:00, ?it/s]Loading data from path/Data_files_with_label/train/train_1.mat ... (0 / 30)
+1it [00:32, 32.93s/it]1it [00:32, 32.96s/it]Loading data from path/Data_files_with_label/train/train_10.mat ... (1 / 30)
