@@ -49,11 +49,11 @@ def get_args_parser():
 
     # Optimization parameters
     parser.add_argument('--lr', default=1e-4, type=float)
-    parser.add_argument('--lrf', default=0.001, type=float)
+    parser.add_argument('--lrf', default=0.01, type=float)
     parser.add_argument('--weight_decay', default=0.0, type=float)
-    parser.add_argument('--epochs', default=1000, type=int)
+    parser.add_argument('--epochs', default=300, type=int)
     parser.add_argument('--batch_size', default=5, type=int)
-    parser.add_argument('--num_workers', default=5, type=int)
+    parser.add_argument('--num_workers', default=8, type=int)
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
     # dataset parameters
