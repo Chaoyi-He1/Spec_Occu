@@ -1,33 +1,0 @@
-nohup: ignoring input
-WARNING:torch.distributed.run:
-*****************************************
-Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
-*****************************************
-| distributed init (rank 1): env://
-| distributed init (rank 0): env://
-Namespace(amp=True, batch_size=5, cache_data=True, device='cuda', dist_backend='nccl', dist_url='env://', distributed=True, epochs=1000, eval=False, freeze_encoder=False, gpu=0, hpy='cfg/cfg.yaml', lr=0.0001, lrf=0.001, name='', num_workers=5, output_dir='weights/contrast', positional_embedding='sine', rank=0, resume='weights/contrast/', save_best=False, seed=42, start_epoch=0, sync_bn=False, time_step=12, train_path='path/Data_files_with_label/train/', train_split=0.8, val_path='path/Data_files_with_label/val/', weight_decay=0.0, world_size=2)
-Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/
-0it [00:00, ?it/s]Contrastive dataset generating...
-0it [00:00, ?it/s]Loading data from path/Data_files_with_label/train/train_1.mat ... (0 / 30)
-1it [00:32, 32.93s/it]1it [00:32, 32.96s/it]Loading data from path/Data_files_with_label/train/train_10.mat ... (1 / 30)
-2it [01:04, 32.18s/it]2it [01:04, 32.25s/it]Loading data from path/Data_files_with_label/train/train_11.mat ... (2 / 30)
-3it [01:34, 31.21s/it]3it [01:34, 31.19s/it]Loading data from path/Data_files_with_label/train/train_12.mat ... (3 / 30)
-4it [02:08, 32.24s/it]4it [02:08, 32.22s/it]Loading data from path/Data_files_with_label/train/train_13.mat ... (4 / 30)
-5it [02:39, 31.77s/it]Loading data from path/Data_files_with_label/train/train_14.mat ... (5 / 30)
-5it [02:39, 31.79s/it]6it [03:12, 32.21s/it]Loading data from path/Data_files_with_label/train/train_15.mat ... (6 / 30)
-6it [03:12, 32.25s/it]7it [03:42, 31.63s/it]Loading data from path/Data_files_with_label/train/train_16.mat ... (7 / 30)
-7it [03:43, 31.66s/it]8it [04:16, 32.09s/it]8it [04:16, 32.11s/it]Loading data from path/Data_files_with_label/train/train_17.mat ... (8 / 30)
-9it [04:48, 32.16s/it]Loading data from path/Data_files_with_label/train/train_18.mat ... (9 / 30)
-9it [04:48, 32.17s/it]10it [05:20, 32.16s/it]10it [05:20, 32.19s/it]Loading data from path/Data_files_with_label/train/train_19.mat ... (10 / 30)
-11it [05:51, 31.78s/it]11it [05:51, 31.78s/it]Loading data from path/Data_files_with_label/train/train_2.mat ... (11 / 30)
-12it [06:23, 31.95s/it]Loading data from path/Data_files_with_label/train/train_20.mat ... (12 / 30)
-12it [06:23, 31.96s/it]13it [06:57, 32.39s/it]Loading data from path/Data_files_with_label/train/train_21.mat ... (13 / 30)
-13it [06:57, 32.41s/it]14it [07:30, 32.59s/it]Loading data from path/Data_files_with_label/train/train_22.mat ... (14 / 30)
-14it [07:30, 32.58s/it]15it [08:01, 32.18s/it]Loading data from path/Data_files_with_label/train/train_23.mat ... (15 / 30)
-15it [08:01, 32.18s/it]16it [08:32, 31.81s/it]Loading data from path/Data_files_with_label/train/train_24.mat ... (16 / 30)
-16it [08:32, 31.81s/it]17it [09:05, 32.32s/it]17it [09:05, 32.33s/it]Loading data from path/Data_files_with_label/train/train_25.mat ... (17 / 30)
-18it [09:37, 32.13s/it]Loading data from path/Data_files_with_label/train/train_26.mat ... (18 / 30)
-18it [09:37, 32.14s/it]19it [10:10, 32.49s/it]Loading data from path/Data_files_with_label/train/train_27.mat ... (19 / 30)
-19it [10:10, 32.50s/it]20it [10:42, 32.07s/it]20it [10:42, 32.09s/it]Loading data from path/Data_files_with_label/train/train_28.mat ... (20 / 30)
-21it [11:14, 32.13s/it]21it [11:14, 32.14s/it]Loading data from path/Data_files_with_label/train/train_29.mat ... (21 / 30)
-22it [11:50, 33.37s/it]22it [11:50, 33.38s/it]Loading data from path/Data_files_with_label/train/train_3.mat ... (22 / 30)
