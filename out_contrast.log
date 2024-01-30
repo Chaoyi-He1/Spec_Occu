@@ -1,0 +1,11 @@
+nohup: ignoring input
+WARNING:torch.distributed.run:
+*****************************************
+Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+*****************************************
+| distributed init (rank 1): env://
+| distributed init (rank 0): env://
+Namespace(amp=True, batch_size=5, cache_data=True, device='cuda', dist_backend='nccl', dist_url='env://', distributed=True, epochs=1000, eval=False, freeze_encoder=False, gpu=0, hpy='cfg/cfg.yaml', lr=0.0001, lrf=0.001, name='', num_workers=5, output_dir='weights/contrast', positional_embedding='sine', rank=0, resume='weights/contrast/', save_best=False, seed=42, start_epoch=0, sync_bn=False, time_step=12, train_path='path/Data_files_with_label/train/', train_split=0.8, val_path='path/Data_files_with_label/val/', weight_decay=0.0, world_size=2)
+Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/
+0it [00:00, ?it/s]Contrastive dataset generating...
+0it [00:00, ?it/s]Loading data from path/Data_files_with_label/train/train_1.mat ... (0 / 30)
