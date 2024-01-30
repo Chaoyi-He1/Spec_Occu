@@ -28,4 +28,5 @@ Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:600
 16it [08:32, 31.81s/it]17it [09:05, 32.32s/it]17it [09:05, 32.33s/it]Loading data from path/Data_files_with_label/train/train_25.mat ... (17 / 30)
 18it [09:37, 32.13s/it]Loading data from path/Data_files_with_label/train/train_26.mat ... (18 / 30)
 18it [09:37, 32.14s/it]19it [10:10, 32.49s/it]Loading data from path/Data_files_with_label/train/train_27.mat ... (19 / 30)
-19it [10:10, 32.50s/it]
+19it [10:10, 32.50s/it]20it [10:42, 32.07s/it]20it [10:42, 32.09s/it]Loading data from path/Data_files_with_label/train/train_28.mat ... (20 / 30)
+21it [11:14, 32.13s/it]21it [11:14, 32.14s/it]Loading data from path/Data_files_with_label/train/train_29.mat ... (21 / 30)
