@@ -449,7 +449,19 @@ class Encoder_Regressor(nn.Module):
             nn.Conv1d(in_channels=cfg["contrast_sequence_length"],
                       out_channels=1,
                       kernel_size=1, stride=1, padding=0),
-            nn.Flatten(start_dim=-2, end_dim=-1))
+            nn.Flatten(start_dim=-2, end_dim=-1)) if in_type == "1d" else \
+            nn.Sequential(
+                nn.Conv2d(in_channels=cfg["in_channels"],
+                          out_channels=1,
+                          kernel_size=(1, 1), stride=(1, 1), padding=(0, 0)),
+                nn.Flatten(start_dim=1, end_dim=2),
+                nn.Conv1d(in_channels=cfg["contrast_sequence_length"],
+                          out_channels=cfg["contrast_sequence_length"],
+                          kernel_size=127, stride=31, padding=padding_input_proj),
+                nn.Conv1d(in_channels=cfg["contrast_sequence_length"],
+                          out_channels=1,
+                          kernel_size=1, stride=1, padding=0),
+                nn.Flatten(start_dim=-2, end_dim=-1)) 
         
         self.AutoEncoder_cfg = {
             "in_dim": (cfg["num_frames_per_clip"], cfg["Temporal_dim"]),

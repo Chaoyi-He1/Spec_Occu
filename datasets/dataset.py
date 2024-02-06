@@ -178,8 +178,8 @@ class Contrastive_data_multi_env(Dataset):
             # if the data is from h5py file, it means that the data is cached,
             # the dict contains I and Q channel, each channel is a 2D matrix
             # with shape (num_frames, temporal_dim)
-            real = data["data_frame_I"][:51200, :].astype(np.float32)
-            imag = data["data_frame_Q"][:51200, :].astype(np.float32)
+            real = data["data_frame_I"][:102400, :].astype(np.float32)
+            imag = data["data_frame_Q"][:102400, :].astype(np.float32)
             data = np.stack([real, imag], axis=1)
             # data_c = real + 1j * imag
             # data_fft = np.fft.fft(data_c, axis=-1)
