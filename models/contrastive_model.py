@@ -651,8 +651,8 @@ class Feature_Extractor_cls(nn.Module):
         return self.cls_head(feature)
 
 
-def build_contrastive_model(cfg: dict = None, timestep: int = 12, pos_type: str = "sine") -> nn.Module:
-    return Encoder_Regressor(cfg, timestep, pos_type)
+def build_contrastive_model(cfg: dict = None, timestep: int = 12, pos_type: str = "sine", in_type: str = "1d") -> nn.Module:
+    return Encoder_Regressor(cfg, timestep, pos_type, in_type=in_type)
 
 
 def build_feature_extractor(cfg: dict = None, pos_type: str = "sine", in_type: str = "1d") -> nn.Module:

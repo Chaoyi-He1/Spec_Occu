@@ -5,7 +5,7 @@ Temporal_dim: 1024
 in_channels: 2
 dropout: 0.2
 drop_path: 0.2
-in_type: "2d" # 1d or 2d
+in_type: "1d" # 1d or 2d
 
 # Contrastive model
 contrast_embed_dim: 512  # This is fixed based on the Encoder's convolution channels
@@ -13,7 +13,7 @@ num_contrast_blocks: 4
 feature_dim: 128
 num_contrast_layers: 8
 nhead: 4
-contrast_sequence_length: 512 # this is the number of time frames of the history feeded to the model
+contrast_sequence_length: 64 # this is the number of time frames of the history feeded to the model
 dim_feedforward: 512
 time_step_weights: [1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]
 contrast_normalize_before: True

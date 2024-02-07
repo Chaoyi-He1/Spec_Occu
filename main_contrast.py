@@ -147,7 +147,7 @@ def main(args):
     
     # model
     print("Model generating...")
-    model = build_contrastive_model(cfg=cfg, timestep=args.time_step, pos_type=args.positional_embedding)
+    model = build_contrastive_model(cfg=cfg, timestep=args.time_step, pos_type=args.positional_embedding, in_type=cfg["in_type"])
     model.to(device)
     if args.rank in [-1, 0]:
         input = torch.randn((args.batch_size, 
