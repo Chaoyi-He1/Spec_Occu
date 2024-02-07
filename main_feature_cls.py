@@ -23,7 +23,7 @@ import torch.multiprocessing
 import util.misc as utils
 from datasets.dataset import Contrastive_data, Contrastive_data_multi_env
 from models.contrastive_model import *
-from train_eval.train_eval_contrast import *
+from train_eval.train_eval_feature_cls import *
 from util.Contrastive import ContrastiveLoss
 
 
@@ -61,7 +61,7 @@ def get_args_parser():
     parser.add_argument('--val-path', default='path/Data_files_with_label/val/', help='val dataset path')
     parser.add_argument('--cache-data', default=True, type=bool, help='cache data for faster training')
     parser.add_argument('--train-split', default=0.8, type=float, help='train split')
-    parser.add_argument('--output-dir', default='weights/contrast', help='path where to save, empty for no saving')
+    parser.add_argument('--output-dir', default='weights/feature_cls', help='path where to save, empty for no saving')
 
     # distributed training parameters
     parser.add_argument('--world_size', default=2, type=int, help='number of distributed processes')
@@ -232,7 +232,7 @@ def main(args):
     scheduler.last_epoch = start_epoch  # do not move
     
     # loss function
-    criterion = ContrastiveLoss(time_step_weights=cfg["time_step_weights"])
+    criterion = cls_criterion
 
     # start training
     print("Start training...")
@@ -247,13 +247,13 @@ def main(args):
         train_loss_dict = train_one_epoch(model=model, data_loader=data_loader_train, 
                                           criterion=criterion, optimizer=optimizer, 
                                           device=device, epoch=epoch, scaler=scaler,
-                                          steps=args.time_step)
+                                          )
         scheduler.step()
 
         # validation
         test_loss_dict = evaluate(model=model, data_loader=data_loader_val, 
                                   criterion=criterion, device=device, 
-                                  steps=args.time_step)
+                                  )
         
         # write results
         log_stats = {**{f'train_{k}': v for k, v in train_loss_dict.items()},

@@ -290,7 +290,7 @@ class Contrastive_data_multi_env(Dataset):
         index = np.array(index)
         data_past = torch.from_numpy(data_past).float()
         data_future = torch.from_numpy(data_future).float()
-        index = torch.from_numpy(index).int()
+        index = torch.from_numpy(index).long()
         return data_past, data_future, index
 
 
