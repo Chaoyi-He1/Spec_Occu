@@ -49,7 +49,7 @@ class PositionEmbeddingLearned(nn.Module):
     """
     def __init__(self, num_pos_feats=256):
         super().__init__()
-        self.embed = nn.Embedding(100, num_pos_feats)
+        self.embed = nn.Embedding(2048, num_pos_feats)
         self.reset_parameters()
 
     def reset_parameters(self):
