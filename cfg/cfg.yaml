@@ -11,7 +11,7 @@ in_type: "1d" # 1d or 2d
 contrast_embed_dim: 512  # This is fixed based on the Encoder's convolution channels
 num_contrast_blocks: 4
 feature_dim: 128
-num_contrast_layers: 8
+num_contrast_layers: 16
 nhead: 4
 contrast_sequence_length: 1024 # this is the number of time frames of the history feeded to the model
 dim_feedforward: 512
