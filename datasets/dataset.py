@@ -230,7 +230,7 @@ class Contrastive_data_multi_env(Dataset):
                 data = self.h5py_to_dict(f)
             if self.cache:
                 data = self.preprocess_data(data)
-                data_dict[i] = data * 100
+                data_dict[i] = (data * 100).astype(np.float16)
                 data_len[i] = data.shape[0] - self.past_steps - self.future_steps + 1
             else:
                 data_dict[i] = None
