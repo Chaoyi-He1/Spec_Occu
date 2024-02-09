@@ -174,6 +174,7 @@ def main(args):
             ckpt["model"] = {k: v for k, v in ckpt["model"].items() 
                              if model.feature_extractor.state_dict()[k].numel() == v.numel()}
             model.feature_extractor.load_state_dict(ckpt["model"], strict=False)
+            model.cls_head.load_state_dict(ckpt["cls_head"], strict=False)
         except KeyError as e:
             s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
                 % (args.weights, args.hyp, args.weights)
@@ -296,6 +297,7 @@ def main(args):
             utils.save_on_master({
                 "epoch": epoch,
                 "model": model_without_ddp.feature_extractor.state_dict() if args.distributed else model.feature_extractor.state_dict(),
+                "cls_head": model_without_ddp.cls_head.state_dict() if args.distributed else model.cls_head.state_dict(),
                 "optimizer": optimizer.state_dict(),
                 "scaler": scaler.state_dict() if scaler is not None else None,
                 "lr_scheduler": scheduler.state_dict(),
