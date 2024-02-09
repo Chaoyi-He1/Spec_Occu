@@ -172,8 +172,8 @@ def main(args):
 
         try:
             ckpt["model"] = {k: v for k, v in ckpt["model"].items() 
-                             if model.state_dict()[k].numel() == v.numel()}
-            model.load_state_dict(ckpt["model"], strict=False)
+                             if model.feature_extractor.state_dict()[k].numel() == v.numel()}
+            model.feature_extractor.load_state_dict(ckpt["model"], strict=False)
         except KeyError as e:
             s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
                 % (args.weights, args.hyp, args.weights)
