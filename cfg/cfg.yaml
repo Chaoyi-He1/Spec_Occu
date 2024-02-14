@@ -13,7 +13,7 @@ num_contrast_blocks: 4
 feature_dim: 128
 num_contrast_layers: 12
 nhead: 4
-contrast_sequence_length: 1024 # this is the number of time frames of the history feeded to the model
+contrast_sequence_length: 64 # this is the number of time frames of the history feeded to the model
 dim_feedforward: 512
 time_step_weights: [1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]
 contrast_normalize_before: True
