@@ -38,7 +38,7 @@ def get_args_parser():
     parser.add_argument('--eval', action='store_true', help='only evaluate model on validation set')
 
     # Model parameters
-    parser.add_argument('--resume', type=str, default='weights/contrast/model', help="initial weights path")  # weights/model_940.pth
+    parser.add_argument('--resume', type=str, default='weights/contrast/model_299.pth', help="initial weights path")  # weights/model_940.pth
     parser.add_argument('--time-step', type=int, default=12, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
     parser.add_argument('--positional-embedding', default='sine', choices=('sine', 'learned'),
