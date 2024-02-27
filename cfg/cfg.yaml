@@ -8,9 +8,9 @@ drop_path: 0.2
 in_type: "1d" # 1d or 2d
 
 # Contrastive model
-contrast_embed_dim: 256  # This is fixed based on the Encoder's convolution channels
+contrast_embed_dim: 512  # This is fixed based on the Encoder's convolution channels
 num_contrast_blocks: 4
-feature_dim: 512
+feature_dim: 256
 num_contrast_layers: 4
 nhead: 4
 contrast_sequence_length: 128 # this is the number of time frames of the history feeded to the model
