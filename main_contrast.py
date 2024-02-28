@@ -38,7 +38,7 @@ def get_args_parser():
     parser.add_argument('--eval', action='store_true', help='only evaluate model on validation set')
 
     # Model parameters
-    parser.add_argument('--resume', type=str, default='weights/contrast/model_299', help="initial weights path")  # weights/model_940.pth
+    parser.add_argument('--resume', type=str, default='weights/contrast/model_299.pth', help="initial weights path")  # weights/model_940.pth
     parser.add_argument('--time-step', type=int, default=12, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
     parser.add_argument('--positional-embedding', default='sine', choices=('sine', 'learned'),
@@ -186,7 +186,7 @@ def main(args):
                     file.write(ckpt["training_results"])  # write results.txt
         
         # epochs
-        start_epoch = ckpt["epoch"] + 1
+        # start_epoch = ckpt["epoch"] + 1
         if args.epochs < start_epoch:
             print('%s has been trained for %g epochs. Fine-tuning for %g additional epochs.' %
                   (args.resume, ckpt['epoch'], args.epochs))
