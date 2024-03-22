@@ -135,7 +135,7 @@ def main(args):
     
     # model
     print("Model generating...")
-    model = build_T2F(cfg=cfg, pos_type=args.positional_embedding)
+    model = build_T2F(cfg=cfg, pos_type=args.positional_embedding, model_type="Transformer")
     model.to(device)
     if args.rank in [-1, 0]:
         tb_writer.add_graph(model, torch.randn((args.batch_size, 
