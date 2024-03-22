@@ -14,12 +14,12 @@ class Steps_BCELoss(nn.Module):
     def forward(self, pred: Tensor, targets: Tensor):
         _, l, _ = targets.shape
         device = targets.device
-        pos_weight = targets == 0
+        # pos_weight = targets == 0
         # loss_steps = []
         # for i in range(l):
         #     loss_steps.append(self.bce(pred[:, i, :], targets[:, i, :]))
         # loss_steps = torch.as_tensor(loss_steps).to(device)
-        loss = self.bce(pred, targets) * pos_weight
+        loss = self.bce(pred, targets) # * pos_weight
         return loss.mean()
 
 
