@@ -59,7 +59,7 @@ def get_args_parser():
     parser.add_argument('--val-path', default='path/Data_files_with_label/val/', help='val dataset path')
     parser.add_argument('--cache-data', default=True, type=bool, help='cache data for faster training')
     parser.add_argument('--train-split', default=0.8, type=float, help='train split')
-    parser.add_argument('--output-dir', default='weights', help='path where to save, empty for no saving')
+    parser.add_argument('--output-dir', default='weights/T2F/Transformer', help='path where to save, empty for no saving')
 
     # distributed training parameters
     parser.add_argument('--world_size', default=8, type=int, help='number of distributed processes')
