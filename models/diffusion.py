@@ -348,7 +348,7 @@ class TransformerConcatLinear(Module):
         # final_emb = x.permute(1,0,2).contiguous()
         out += self.pos_emb(out)
 
-        trans = self.transformer_encoder(out, ctx_emb)  # b * L+1 * 128
+        trans = self.transformer_encoder(out, ctx_emb)  # b * L+1 * diffusion_embed_dim
 
         trans = self.concat3(ctx_emb, trans)
         trans = self.concat4(ctx_emb, trans)
