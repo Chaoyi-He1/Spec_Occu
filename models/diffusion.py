@@ -159,7 +159,7 @@ class Conv1d_encoder(nn.Module):
         self.step_embedding = nn.ModuleList()
         self.context_embedding = nn.ModuleList()
         
-        self.res_params = list(zip([4, 4, 8, 8, 6], [5, 7, 9, 9, 11],   # num_blocks, kernel_size
+        self.res_params = list(zip([4, 4, 8, 8, 6], [11, 9, 9, 7, 5],   # num_blocks, kernel_size
                                    [3, 3, 5, 3, 3], [1, 3, 5, 3, 3]))   # stride, dilation
         self.cum_blocks = np.cumsum([4, 4, 8, 8, 6]) + np.arange(5)
         for i, (num_blocks, kernel_size, stride, dilation) in enumerate(self.res_params):
