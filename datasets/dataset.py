@@ -6,6 +6,10 @@ import numpy as np
 from torch.utils.data import Dataset
 from typing import Tuple
 from tqdm import tqdm
+import yaml
+
+
+data_scaling = yaml.load(open("../cfg/cfg.yaml"), Loader=yaml.FullLoader)["data_scaling"]
 
 
 class Contrastive_data(Dataset):
@@ -230,7 +234,7 @@ class Contrastive_data_multi_env(Dataset):
                 data = self.h5py_to_dict(f)
             if self.cache:
                 data = self.preprocess_data(data)
-                data_dict[i] = (data * 100).astype(np.float16)
+                data_dict[i] = (data * data_scaling).astype(np.float16)
                 data_len[i] = data.shape[0] - self.past_steps - self.future_steps + 1
             else:
                 data_dict[i] = None
@@ -393,7 +397,7 @@ class Temporal_to_Freq_data_multi_env(Dataset):
                 data = np.stack([data["data_frame_I"][start_index:start_index + 10000, :],
                                  data["data_frame_Q"][start_index:start_index + 10000, :]], axis=1)
                 assert data.shape[0] == label.shape[0], "data and label must have the same length."
-                data_dict[i] = (data * 100).astype(np.float16)
+                data_dict[i] = (data * data_scaling).astype(np.float16)
                 label_dict[i] = label.astype(int)
                 data_len[i] = data_dict[i].shape[0] - self.time_step + 1
             else:
@@ -497,7 +501,7 @@ class Diffusion_multi_env(Dataset):
                 data = np.stack([data["data_frame_I"][start_index:start_index + 10000, ...],
                                  data["data_frame_Q"][start_index:start_index + 10000, ...]], axis=1)
                 assert data.shape[0] == label.shape[0], "data and label must have the same length."
-                data_dict[i] = (data * 500).astype(np.float16)
+                data_dict[i] = (data * data_scaling).astype(np.float16)
                 label_dict[i] = label.astype(int)
                 data_len[i] = data_dict[i].shape[0] - self.total_time_steps + 1
             else:
