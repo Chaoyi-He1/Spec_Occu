@@ -534,7 +534,7 @@ class Diffusion_multi_env(Dataset):
             label = self.label_dict[index][time_step:time_step + self.total_time_steps, ...]
 
         past_data = data[:self.past_steps, ...]
-        future_data = data[self.past_steps:, ...]
+        future_data = data[self.past_steps:, ...] * 500
         past_label = label[:self.past_steps, ...]
         future_label = label[self.past_steps:, ...]
         return past_data, past_label, future_data, future_label
