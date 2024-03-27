@@ -538,7 +538,7 @@ class Diffusion_multi_env(Dataset):
             label = self.label_dict[index][time_step:time_step + self.total_time_steps, ...]
 
         past_data = data[:self.past_steps, ...]
-        future_data = data[self.past_steps:, ...] * 500
+        future_data = data[self.past_steps:, ...]
         past_label = label[:self.past_steps, ...]
         future_label = label[self.past_steps:, ...]
         return past_data, past_label, future_data, future_label
@@ -609,7 +609,7 @@ class CPC_multi_env_test(Dataset):
                 data = np.stack([data["data_frame_I"][start_index:start_index + 10000, ...],
                                  data["data_frame_Q"][start_index:start_index + 10000, ...]], axis=1)
                 assert data.shape[0] == label.shape[0], "data and label must have the same length."
-                data_dict[i] = (data * 50).astype(np.float16)
+                data_dict[i] = (data * data_scaling).astype(np.float16)
                 label_dict[i] = label.astype(int)
                 data_len[i] = data_dict[i].shape[0] - self.total_time_steps + 1
             else:
