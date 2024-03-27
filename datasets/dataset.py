@@ -497,7 +497,7 @@ class Diffusion_multi_env(Dataset):
                 data = np.stack([data["data_frame_I"][start_index:start_index + 10000, ...],
                                  data["data_frame_Q"][start_index:start_index + 10000, ...]], axis=1)
                 assert data.shape[0] == label.shape[0], "data and label must have the same length."
-                data_dict[i] = (data * 100).astype(np.float16)
+                data_dict[i] = (data * 500).astype(np.float16)
                 label_dict[i] = label.astype(int)
                 data_len[i] = data_dict[i].shape[0] - self.total_time_steps + 1
             else:
