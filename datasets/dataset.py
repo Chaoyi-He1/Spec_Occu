@@ -9,7 +9,7 @@ from tqdm import tqdm
 import yaml
 
 
-data_scaling = yaml.load(open("../cfg/cfg.yaml"), Loader=yaml.FullLoader)["data_scaling"]
+data_scaling = yaml.load(open("./cfg/cfg.yaml"), Loader=yaml.FullLoader)["data_scaling"]
 
 
 class Contrastive_data(Dataset):
