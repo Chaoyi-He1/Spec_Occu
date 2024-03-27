@@ -488,6 +488,12 @@ class Diffusion_multi_env(Dataset):
                 start_index = np.random.randint(0,
                                                 data["data_frame_I"].shape[0] - 20000)
                 label = data["label_frame"][start_index:start_index + 10000, ...]
+                # Print data's I and Q channel mean and std
+                print("I channel mean: %.4f, std: %.4f" % (np.mean(data["data_frame_I"]),
+                                                           np.std(data["data_frame_I"])))
+                print("Q channel mean: %.4f, std: %.4f" % (np.mean(data["data_frame_Q"]),
+                                                           np.std(data["data_frame_Q"])))
+                
                 data = np.stack([data["data_frame_I"][start_index:start_index + 10000, ...],
                                  data["data_frame_Q"][start_index:start_index + 10000, ...]], axis=1)
                 assert data.shape[0] == label.shape[0], "data and label must have the same length."
