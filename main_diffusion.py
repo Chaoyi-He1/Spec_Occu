@@ -40,7 +40,7 @@ def get_args_parser():
 
     # Model parameters
     parser.add_argument('--resume', type=str, default='weights/diffusion/model_052', help="initial weights path")  # weights/model_940.pth
-    parser.add_argument('--encoder-path', type=str, default='', help="encoder path")
+    parser.add_argument('--encoder-path', type=str, default='weights/contrast/model_299.pth', help="encoder path")
     parser.add_argument('--time-step', type=int, default=32, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
     parser.add_argument('--positional-embedding', default='learned', choices=('sine', 'learned'),
@@ -53,7 +53,7 @@ def get_args_parser():
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--lrf', default=0.01, type=float)
     parser.add_argument('--weight_decay', default=0.0, type=float)
-    parser.add_argument('--epochs', default=500, type=int)
+    parser.add_argument('--epochs', default=300, type=int)
     parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--num_workers', default=8, type=int)
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
