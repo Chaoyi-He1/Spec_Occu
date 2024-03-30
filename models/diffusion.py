@@ -159,7 +159,7 @@ class Conv1d_encoder(nn.Module):
         self.step_embedding = nn.ModuleList()
         self.context_embedding = nn.ModuleList()
         
-        self.res_params = list(zip([4, 4, 8, 8, 6], [11, 9, 9, 7, 5],   # num_blocks, kernel_size
+        self.res_params = list(zip([4, 4, 8, 8, 6], [5, 7, 9, 9, 11],   # num_blocks, kernel_size
                                    [3, 3, 5, 3, 3], [1, 3, 5, 3, 3]))   # stride, dilation
         self.cum_blocks = np.cumsum([4, 4, 8, 8, 6]) + np.arange(5)
         for i, (num_blocks, kernel_size, stride, dilation) in enumerate(self.res_params):
@@ -324,11 +324,11 @@ class TransformerConcatLinear(Module):
                                                          padding=(1, 1)))
         self.input_trans = nn.Sequential(
             nn.Conv2d(in_channels=seq_len, out_channels=seq_len,
-                      kernel_size=(3, 7), stride=(1, 1), padding=(1, 3)),
+                      kernel_size=(1, 7), stride=(1, 1), padding=(0, 3)),
             nn.Conv2d(in_channels=seq_len, out_channels=seq_len,
-                      kernel_size=(3, 5), stride=(1, 1), padding=(1, 2)),
+                      kernel_size=(1, 5), stride=(1, 1), padding=(0, 2)),
             nn.Conv2d(in_channels=seq_len, out_channels=seq_len,
-                      kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+                      kernel_size=(1, 3), stride=(1, 1), padding=(0, 1)),
             nn.Conv2d(in_channels=seq_len, out_channels=seq_len,
                       kernel_size=1, stride=1, padding=0),)         
         #self.linear = nn.Linear(128,2)
