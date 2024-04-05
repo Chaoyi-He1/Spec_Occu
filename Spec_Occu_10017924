@@ -2031,3 +2031,22 @@ Averaged stats: ADE_loss: 25.974972; FDE_loss: 27.921534; ADE_percentage: 1.0661
 Epoch: [312]; [  0/180]; eta: 0:06:40; loss: 0.529759; lr: 0.000001; time: 2.2250; data: 1.3368; max mem: 4103
 Epoch: [312]; [ 10/180]; eta: 0:02:28; loss: 0.762697; lr: 0.000001; time: 0.8739; data: 0.1221; max mem: 4103
 Epoch: [312]; [ 20/180]; eta: 0:02:08; loss: 0.701279; lr: 0.000001; time: 0.7350; data: 0.0006; max mem: 4103
+Epoch: [312]; [ 30/180]; eta: 0:01:57; loss: 0.608476; lr: 0.000001; time: 0.7376; data: 0.0006; max mem: 4103
+Epoch: [312]; [ 40/180]; eta: 0:01:46; loss: 0.615602; lr: 0.000001; time: 0.7169; data: 0.0007; max mem: 4103
+Epoch: [312]; [ 50/180]; eta: 0:01:38; loss: 0.587474; lr: 0.000001; time: 0.7055; data: 0.0007; max mem: 4103
+Epoch: [312]; [ 60/180]; eta: 0:01:30; loss: 0.695083; lr: 0.000001; time: 0.7327; data: 0.0007; max mem: 4103
+Epoch: [312]; [ 70/180]; eta: 0:01:22; loss: 0.612775; lr: 0.000001; time: 0.7433; data: 0.0007; max mem: 4103
+Epoch: [312]; [ 80/180]; eta: 0:01:15; loss: 0.648224; lr: 0.000001; time: 0.7432; data: 0.0006; max mem: 4103
+Epoch: [312]; [ 90/180]; eta: 0:01:07; loss: 0.643515; lr: 0.000001; time: 0.7438; data: 0.0006; max mem: 4103
+Epoch: [312]; [100/180]; eta: 0:00:59; loss: 0.697783; lr: 0.000001; time: 0.7434; data: 0.0007; max mem: 4103
+Epoch: [312]; [110/180]; eta: 0:00:52; loss: 0.726217; lr: 0.000001; time: 0.7433; data: 0.0006; max mem: 4103
+Epoch: [312]; [120/180]; eta: 0:00:44; loss: 0.642634; lr: 0.000001; time: 0.7384; data: 0.0007; max mem: 4103
+Epoch: [312]; [130/180]; eta: 0:00:37; loss: 0.608519; lr: 0.000001; time: 0.7384; data: 0.0007; max mem: 4103
+Epoch: [312]; [140/180]; eta: 0:00:29; loss: 0.652875; lr: 0.000001; time: 0.7424; data: 0.0006; max mem: 4103
+Epoch: [312]; [150/180]; eta: 0:00:22; loss: 0.611941; lr: 0.000001; time: 0.7423; data: 0.0007; max mem: 4103
+Epoch: [312]; [160/180]; eta: 0:00:14; loss: 0.672414; lr: 0.000001; time: 0.7435; data: 0.0007; max mem: 4103
+Epoch: [312]; [170/180]; eta: 0:00:07; loss: 0.715672; lr: 0.000001; time: 0.7408; data: 0.0006; max mem: 4103
+Epoch: [312]; [179/180]; eta: 0:00:00; loss: 0.629231; lr: 0.000001; time: 0.7363; data: 0.0006; max mem: 4103
+Epoch: [312] Total time: 0:02:14 (0.7466 s / it)
+Averaged stats: loss: 0.629231; lr: 0.000001
+Test:; [ 0/56]; eta: 0:14:08; ADE_loss: 25.852837; FDE_loss: 25.758045; ADE_percentage: 1.074293; FDE_percentage: 1.081031; time: 15.1479; data: 1.9124; max mem: 4103
