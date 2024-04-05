@@ -14,9 +14,9 @@ num_contrast_blocks: 4
 feature_dim: 256
 num_contrast_layers: 4
 nhead: 8
-contrast_sequence_length: 256 # this is the number of time frames of the history feeded to the model
+contrast_sequence_length: 128 # this is the number of time frames of the history feeded to the model
 dim_feedforward: 512
-time_step_weights: [1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]
+time_step_weights: [1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]
 contrast_normalize_before: True
 contrast_attention: True    # use pure attention (True) or attention with Conv1d (False) for Auto Regressive
 num_frames_per_clip: 64    # number of frames per block for the encoder
