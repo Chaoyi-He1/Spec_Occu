@@ -158,7 +158,7 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
     all_predictions = torch.concatenate(all_predictions, dim=1)
     # Compute the precision and recall for different thresholds
     for threshold in np.linspace(0, 1, 100):
-        all_labels = 
+        pass
     
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
