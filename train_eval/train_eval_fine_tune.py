@@ -114,14 +114,20 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
 
-def evaluate(encoder: torch.nn.Module, model: torch.nn.Module, 
-             criterion: Diffusion_utils, data_loader: Iterable, 
+def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module, 
+             T2F_model: torch.nn.Module, diff_criterion: Diffusion_utils, 
+             T2F_criterion: Temporal_Freq_Loss, data_loader: Iterable, 
              device: torch.device, scaler=None, repeat=20, epoch=0):
     
     encoder.eval()
-    model.eval()
-    criterion.eval()
+    diff_model.eval()
+    T2F_model.eval()
+    diff_criterion.eval()
+    T2F_criterion.eval()
+    
     metric_logger = MetricLogger(delimiter="; ")
+    metric_logger.add_meter('acc', SmoothedValue(window_size=10, fmt='{value:.6f}'))
+    metric_logger.add_meter('F1_score', SmoothedValue(window_size=10, fmt='{value:.6f}'))
     metric_logger.add_meter('ADE_loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     metric_logger.add_meter('FDE_loss', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     metric_logger.add_meter('ADE_percentage', SmoothedValue(window_size=1, fmt='{value:.6f}'))
@@ -139,19 +145,30 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
         # Compute the output
         with torch.cuda.amp.autocast(enabled=scaler is not None), torch.no_grad():
             features = encoder(history)
-            predict = criterion.sample(num_points=l, context=features, sample=repeat, bestof=False, step=10,
-                                       model=model, point_dim=d, flexibility=0.0, ret_traj=False, sampling="ddpm")
-        
+            predict = diff_criterion.sample(num_points=l, context=features, sample=repeat, bestof=False, step=10,
+                                            model=diff_model, point_dim=d, flexibility=0.0, ret_traj=False, sampling="ddpm")
+            predict_label = T2F_model(predict[0])
+            
+            loss_T2F, acc_steps = T2F_criterion(predict_label, future_labels)
+            acc = acc_steps.mean()
+            F1score = F1_score(predict_label, future_labels)
+            
+            all_predictions.append(predict.detach().cpu())
+            all_true_labels.append(future_labels.detach().cpu())
+            
         ADE, FDE, ADE_percents, FDE_percents = compute_batch_statistics(predict, future)
-        all_predictions.append(predict.detach().cpu())
-        all_true_labels.append(future_labels.detach().cpu())
+        
         # reduce losses over all GPUs for logging purposes
+        acc_reduced = reduce_loss(acc)
+        F1score_reduced = reduce_loss(F1score)
         ADE_reduced = reduce_loss(ADE)
         FDE_reduced = reduce_loss(FDE)
         ADE_percents_reduced = reduce_loss(ADE_percents)
         FDE_percents_reduced = reduce_loss(FDE_percents)
 
         # Update metric
+        metric_logger.update(acc=acc_reduced.item())
+        metric_logger.update(F1_score=F1score_reduced.item())
         metric_logger.update(ADE_loss=ADE_reduced.mean().item())
         metric_logger.update(FDE_loss=FDE_reduced.mean().item())
         metric_logger.update(ADE_percentage=ADE_percents_reduced.mean().item())
@@ -165,7 +182,7 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
     recalls = []
     precisions = []
     for threshold in np.linspace(0, 1, 100):
-        all_predictions_label = (all_predictions >= threshold).int()
+        all_predictions_label = (all_predictions > threshold).int()
         all_predictions_label = np.round(all_predictions_label.sum(axis=0) / repeat)
         
         # Compute the precision and recall
