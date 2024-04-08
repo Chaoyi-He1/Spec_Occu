@@ -63,7 +63,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
                                             sample=1, bestof=False, step=10,
                                             model=diff_model, point_dim=future.shape[-1], 
                                             flexibility=0.0, ret_traj=False, sampling="ddpm")
-            predict = predict[0].detach() / 50.0
+            predict = predict[0].detach() # / 50.0
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             predict_label = T2F_model(predict)
             # print(torch.isnan(predict_label).any())
