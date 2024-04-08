@@ -1,5 +1,7 @@
 import torch
+import numpy as np
 import torch.nn as nn
+import matplotlib.pyplot as plt
 from util.misc import *
 from util.diffusion import *
 from typing import Iterable
@@ -114,7 +116,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
 
 def evaluate(encoder: torch.nn.Module, model: torch.nn.Module, 
              criterion: Diffusion_utils, data_loader: Iterable, 
-             device: torch.device, scaler=None, repeat=20):
+             device: torch.device, scaler=None, repeat=20, epoch=0):
     
     encoder.eval()
     model.eval()
@@ -127,6 +129,7 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
     header = 'Test:'
 
     all_predictions = []
+    all_true_labels = []
     for _, (history, hist_labels,
             future, future_labels) in enumerate(metric_logger.log_every(data_loader, 10, header)):
         history = history.to(device)
@@ -140,7 +143,8 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
                                        model=model, point_dim=d, flexibility=0.0, ret_traj=False, sampling="ddpm")
         
         ADE, FDE, ADE_percents, FDE_percents = compute_batch_statistics(predict, future)
-        all_predictions.append(predict)
+        all_predictions.append(predict.detach().cpu())
+        all_true_labels.append(future_labels.detach().cpu())
         # reduce losses over all GPUs for logging purposes
         ADE_reduced = reduce_loss(ADE)
         FDE_reduced = reduce_loss(FDE)
@@ -155,13 +159,41 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
     
     # Transfer the all_predictions from list to tensor and compute the precision and recall for different thresholds, plot the ROC curve
     # Concat the all_predictions among the batch dimension
-    all_predictions = torch.concatenate(all_predictions, dim=1)
+    all_predictions = torch.concatenate(all_predictions, dim=1).numpy()
+    all_true_labels = torch.concatenate(all_true_labels, dim=0).numpy()
     # Compute the precision and recall for different thresholds
+    recalls = []
+    precisions = []
     for threshold in np.linspace(0, 1, 100):
-        pass
+        all_predictions_label = (all_predictions >= threshold).int()
+        all_predictions_label = np.round(all_predictions_label.sum(axis=0) / repeat)
+        
+        # Compute the precision and recall
+        TP = (all_predictions_label * all_true_labels).sum()
+        FP = (all_predictions_label * (1 - all_true_labels)).sum()
+        FN = ((1 - all_predictions_label) * all_true_labels).sum()
+        precision = TP / (TP + FP)
+        recall = TP / (TP + FN)
+        
+        precisions.append(precision)
+        recalls.append(recall)
     
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
+    
+    # Plot the ROC curve
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(recalls, precisions, label="ROC curve for the model")
+    ax.set_xlabel("Recall")
+    ax.set_ylabel("Precision")
+    ax.set_title("ROC curve")
+    plt.legend()
+    plt.grid(True)
+    # if fine_tune_roc folder does not exist, create it
+    if not os.path.exists("fine_tune_roc"):
+        os.makedirs("fine_tune_roc")
+    plt.savefig("fine_tune_roc/ROC_curve_Epoch_{}.png".format(epoch))
 
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
