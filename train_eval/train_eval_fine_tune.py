@@ -126,6 +126,7 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
     metric_logger.add_meter('FDE_percentage', SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Test:'
 
+    all_predictions = []
     for _, (history, hist_labels,
             future, future_labels) in enumerate(metric_logger.log_every(data_loader, 10, header)):
         history = history.to(device)
@@ -139,6 +140,7 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
                                        model=model, point_dim=d, flexibility=0.0, ret_traj=False, sampling="ddpm")
         
         ADE, FDE, ADE_percents, FDE_percents = compute_batch_statistics(predict, future)
+        all_predictions.append(predict)
         # reduce losses over all GPUs for logging purposes
         ADE_reduced = reduce_loss(ADE)
         FDE_reduced = reduce_loss(FDE)
@@ -150,6 +152,13 @@ def evaluate(encoder: torch.nn.Module, model: torch.nn.Module,
         metric_logger.update(FDE_loss=FDE_reduced.mean().item())
         metric_logger.update(ADE_percentage=ADE_percents_reduced.mean().item())
         metric_logger.update(FDE_percentage=FDE_percents_reduced.mean().item())
+    
+    # Transfer the all_predictions from list to tensor and compute the precision and recall for different thresholds, plot the ROC curve
+    # Concat the all_predictions among the batch dimension
+    all_predictions = torch.concatenate(all_predictions, dim=1)
+    # Compute the precision and recall for different thresholds
+    for threshold in np.linspace(0, 1, 100):
+        all_labels = 
     
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
