@@ -140,6 +140,7 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             future, future_labels) in enumerate(metric_logger.log_every(data_loader, 10, header)):
         history = history.to(device)
         future = future.to(device)
+        future_labels = future_labels.to(device)
         b, l, c, d = future.shape
 
         # Compute the output
