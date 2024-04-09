@@ -374,9 +374,10 @@ def main(args):
             scheduler_T2F.step()
 
         # evaluate
-        test_loss_dict = evaluate(encoder=encoder, model=diffusion_model,
-                                  criterion=diffusion_util, data_loader=data_loader_val,
-                                  device=device, scaler=scaler, repeat=cfg["diffusion_repeat"])
+        test_loss_dict = evaluate(encoder=encoder, diff_model=diffusion_model, T2F_model=T2F_model,
+                                  diff_criterion=diffusion_util, T2F_criterion=T2F_criterion, 
+                                  data_loader=data_loader_val, device=device, scaler=scaler, 
+                                  repeat=cfg["diffusion_repeat"], epoch=epoch)
         
         # write results
         log_stats = {**{f'train_{k}': v for k, v in train_loss_dict.items()},
