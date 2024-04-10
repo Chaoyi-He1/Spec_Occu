@@ -207,11 +207,11 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     # Plot the ROC curve, write each threshold's value near each point
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.plot(TPRs, FPRs, label="ROC curve for the model")
+    ax.plot(FPRs, TPRs, label="ROC curve for the model")
     for i, txt in enumerate(np.linspace(10, 80, 100)):
         ax.annotate("{:.2f}".format(txt), (TPRs[i], FPRs[i]))
-    ax.set_xlabel("Recall")
-    ax.set_ylabel("Precision")
+    ax.set_xlabel("FP Rate")
+    ax.set_ylabel("TP Rate")
     ax.set_title("ROC curve")
     plt.legend()
     plt.grid(True)
