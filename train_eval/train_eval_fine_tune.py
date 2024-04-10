@@ -161,7 +161,7 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         
         # reduce losses over all GPUs for logging purposes
         acc_reduced = reduce_loss(acc)
-        F1score_reduced = reduce_loss(torch.stack(F1score).mean().item())
+        F1score_reduced = reduce_loss(torch.stack(F1score).mean())
         ADE_reduced = reduce_loss(ADE)
         FDE_reduced = reduce_loss(FDE)
         ADE_percents_reduced = reduce_loss(ADE_percents)
