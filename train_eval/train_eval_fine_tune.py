@@ -146,18 +146,18 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         # Compute the output
         with torch.cuda.amp.autocast(enabled=scaler is not None), torch.no_grad():
             features = encoder(history)
-            predict = diff_criterion.sample(num_points=l, context=features, sample=repeat, bestof=False, step=10,
+            predicts = diff_criterion.sample(num_points=l, context=features, sample=repeat, bestof=False, step=10,
                                             model=diff_model, point_dim=d, flexibility=0.0, ret_traj=False, sampling="ddpm")
-            predict_label = T2F_model(predict[0])
+            predict_label = torch.stack([T2F_model(predict) for predict in predicts], dim=0)
             
-            loss_T2F, acc_steps = T2F_criterion(predict_label, future_labels)
+            loss_T2F, acc_steps = T2F_criterion(predict_label.mean(dim=0), future_labels)
             acc = acc_steps.mean()
-            F1score = F1_score(predict_label, future_labels)
+            F1score = F1_score(predict_label.mean(dim=0), future_labels)
             
-            all_predictions.append(predict.detach().cpu())
+            all_predictions.append(predict_label.detach().cpu())
             all_true_labels.append(future_labels.detach().cpu())
             
-        ADE, FDE, ADE_percents, FDE_percents = compute_batch_statistics(predict, future)
+        ADE, FDE, ADE_percents, FDE_percents = compute_batch_statistics(predicts, future)
         
         # reduce losses over all GPUs for logging purposes
         acc_reduced = reduce_loss(acc)
@@ -182,8 +182,8 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     # Compute the precision and recall for different thresholds
     recalls = []
     precisions = []
-    for threshold in np.linspace(0, 1, 100):
-        all_predictions_label = (all_predictions > threshold).astype(int)
+    for threshold in np.linspace(10, 80, 100):
+        all_predictions_label = (all_predictions >= threshold).astype(int)
         all_predictions_label = np.round(all_predictions_label.sum(axis=0) / repeat)
         
         # Compute the precision and recall
