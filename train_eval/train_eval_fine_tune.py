@@ -200,10 +200,12 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
     
-    # Plot the ROC curve
+    # Plot the ROC curve, write each threshold's value near each point
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.plot(recalls, precisions, label="ROC curve for the model")
+    for i, txt in enumerate(np.linspace(10, 80, 100)):
+        ax.annotate("{:.2f}".format(txt), (recalls[i], precisions[i]))
     ax.set_xlabel("Recall")
     ax.set_ylabel("Precision")
     ax.set_title("ROC curve")
