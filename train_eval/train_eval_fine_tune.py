@@ -179,22 +179,26 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     # Concat the all_predictions among the batch dimension
     all_predictions = torch.concatenate(all_predictions, dim=1).numpy()
     all_true_labels = torch.concatenate(all_true_labels, dim=0).numpy()
-    # Compute the precision and recall for different thresholds
-    recalls = []
-    precisions = []
+    # Compute the TPR and FPR for different thresholds
+    TPRs = []
+    FPRs = []
     for threshold in np.linspace(10, 80, 100):
         all_predictions_label = (all_predictions >= threshold).astype(int)
         all_predictions_label = np.round(all_predictions_label.sum(axis=0) / repeat)
         
         # Compute the precision and recall
         TP = (all_predictions_label * all_true_labels).sum()
+        TN = ((1 - all_predictions_label) * (1 - all_true_labels)).sum()
         FP = (all_predictions_label * (1 - all_true_labels)).sum()
         FN = ((1 - all_predictions_label) * all_true_labels).sum()
-        precision = TP / (TP + FP)
-        recall = TP / (TP + FN)
         
-        precisions.append(precision)
-        recalls.append(recall)
+        assert (TP + FN) != 0 and (FP + TN) != 0, "TP + FN and FP + TN should not be zero"
+        TPR = TP / (TP + FN)
+        FPR = FP / (FP + TN)
+        
+        
+        TPRs.append(TPR)
+        FPRs.append(FPR)
     
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
@@ -203,9 +207,9 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     # Plot the ROC curve, write each threshold's value near each point
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.plot(recalls, precisions, label="ROC curve for the model")
+    ax.plot(TPRs, FPRs, label="ROC curve for the model")
     for i, txt in enumerate(np.linspace(10, 80, 100)):
-        ax.annotate("{:.2f}".format(txt), (recalls[i], precisions[i]))
+        ax.annotate("{:.2f}".format(txt), (TPRs[i], FPRs[i]))
     ax.set_xlabel("Recall")
     ax.set_ylabel("Precision")
     ax.set_title("ROC curve")
