@@ -183,7 +183,7 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     recalls = []
     precisions = []
     for threshold in np.linspace(0, 1, 100):
-        all_predictions_label = (all_predictions > threshold).int()
+        all_predictions_label = (all_predictions > threshold).astype(int)
         all_predictions_label = np.round(all_predictions_label.sum(axis=0) / repeat)
         
         # Compute the precision and recall
