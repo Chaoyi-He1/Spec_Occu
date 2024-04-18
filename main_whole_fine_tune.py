@@ -192,7 +192,8 @@ def main(args):
                                if encoder.state_dict()[k].numel() == v.numel()}
             encoder.load_state_dict(ckpt["encoder"], strict=False)
             
-            if ckpt["T2F_model"] is not None:
+            # Check if ckpt has T2F_model key
+            if "T2F_model" in ckpt.keys():
                 ckpt["T2F_model"] = {k: v for k, v in ckpt["T2F_model"].items()
                                      if T2F_model.state_dict()[k].numel() == v.numel()}
                 T2F_model.load_state_dict(ckpt["T2F_model"], strict=False)
