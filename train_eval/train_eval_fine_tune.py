@@ -209,7 +209,7 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     ax = fig.add_subplot(111)
     ax.plot(FPRs, TPRs, label="ROC curve for the model")
     for i, txt in enumerate(np.linspace(10, 80, 100)):
-        ax.annotate("{:.2f}".format(txt), (FPRs[i] + 0.1, TPRs[i] - 0.1))
+        ax.annotate("{:.2f}".format(txt), (FPRs[i] + 0.1, TPRs[i] - 0.1), fontsize=8)
     ax.set_xlabel("FP Rate")
     ax.set_ylabel("TP Rate")
     ax.set_title("ROC curve")
