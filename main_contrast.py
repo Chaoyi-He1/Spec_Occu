@@ -39,7 +39,7 @@ def get_args_parser():
 
     # Model parameters
     parser.add_argument('--resume', type=str, default='weights/contrast/model_299', help="initial weights path")  # weights/model_940.pth
-    parser.add_argument('--time-step', type=int, default=32, help="number of time steps to predict")
+    parser.add_argument('--time-step', type=int, default=12, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
     parser.add_argument('--positional-embedding', default='sine', choices=('sine', 'learned'),
                         help="type of positional embedding to use on top of the image features")
