@@ -22,7 +22,7 @@ class Steps_BCELoss(nn.Module):
         loss[FP_position] *= 5
         loss[FN_position] *= 5
         
-        return loss.mean(), FP_position, FN_position
+        return loss.mean()
 
 
 class Temporal_Freq_Loss(nn.Module):
