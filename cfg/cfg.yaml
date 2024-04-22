@@ -11,7 +11,7 @@ data_scaling: 1000
 # Contrastive model
 contrast_embed_dim: 512  # This is fixed based on the Encoder's convolution channels
 num_contrast_blocks: 4
-feature_dim: 128
+feature_dim: 128  #256
 num_contrast_layers: 4
 nhead: 8
 contrast_sequence_length: 1024 #128 # this is the number of time frames of the history feeded to the model
