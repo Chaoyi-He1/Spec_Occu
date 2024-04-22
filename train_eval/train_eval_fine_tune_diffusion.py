@@ -74,7 +74,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         loss += loss_T2F
         
         # Backward
-        loss_bp = BCELoss * loss_weights
+        loss_bp = (BCELoss * loss_weights).mean()
         diff_optimizer.zero_grad()
         if scaler is not None:
             scaler.scale(loss_bp).backward()
