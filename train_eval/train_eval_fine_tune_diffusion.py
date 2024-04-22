@@ -16,8 +16,11 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
                     T2F_model: torch.nn.Module, diff_criterion: Diffusion_utils, 
                     T2F_criterion: Temporal_Freq_Loss, data_loader: Iterable, 
                     diff_optimizer: torch.optim.Optimizer, T2F_optimizer: torch.optim.Optimizer,
+                    ALL_optimizer: torch.optim.Optimizer, 
                     device: torch.device, epoch: int, max_norm: float = 0.01, 
                     scaler=None, freeze_encoder: bool =False):
+    torch.autograd.set_detect_anomaly(True)
+
     encoder.train()
     diff_model.train()
     T2F_model.train()
@@ -39,7 +42,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             features = encoder(history)
-            BCELoss = diff_criterion.get_loss_fine_tune(x_0=future, context=features, model=diff_model)
+            BCELoss, predict = diff_criterion.get_loss_fine_tune(x_0=future, context=features, model=diff_model)
         
             loss = BCELoss.mean()
             # F1score = F1_score(predict_label, future_labels)
@@ -47,24 +50,13 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         if torch.isnan(loss):
             raise ValueError('NaN loss detected')
         
-        if max_norm > 0:
-            params = diff_model.parameters() if freeze_encoder \
-                else chain(encoder.parameters(), diff_model.parameters())
-            torch.nn.utils.clip_grad_norm_(params, max_norm)
-        
         with torch.cuda.amp.autocast(enabled=scaler is not None), torch.no_grad():
-            features = encoder(history)
-            predict = diff_criterion.sample(num_points=future.shape[1], context=features, 
-                                            sample=1, bestof=False, step=10,
-                                            model=diff_model, point_dim=future.shape[-1], 
-                                            flexibility=0.0, ret_traj=False, sampling="ddpm")
-            predict = predict[0].detach() # / 50.0
             predict_label = T2F_model(predict)
             
             loss_T2F, acc_steps = T2F_criterion(predict_label, future_labels)
             FP_position, FN_position = torch.logical_and(F.sigmoid(predict_label) < 0.5, future_labels == 1), torch.logical_and(F.sigmoid(predict_label) > 0.5, future_labels == 0)
             FP_position_frame, FN_position_frame = torch.sum(FP_position, dim=(0, 2)), torch.sum(FN_position, dim=(0, 2))
-            loss_weights = FP_position_frame * 5 + FN_position_frame * 5
+            loss_weights = (FP_position_frame * 5 + FN_position_frame * 5) + 1
             
             acc = acc_steps.mean()
             F1score = F1_score(predict_label, future_labels)
@@ -74,12 +66,18 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         loss += loss_T2F
         
         # Backward
-        loss_bp = (BCELoss * loss_weights).mean()
+        loss_bp = BCELoss * loss_weights.detach()
+        loss_bp = loss_bp.mean()
         diff_optimizer.zero_grad()
         if scaler is not None:
             scaler.scale(loss_bp).backward()
         else:
             loss_bp.backward()
+            
+        if max_norm > 0:
+            params = diff_model.parameters() if freeze_encoder \
+                else chain(encoder.parameters(), diff_model.parameters())
+            torch.nn.utils.clip_grad_norm_(params, max_norm)
             
         # reduce losses over all GPUs for logging purposes
         loss_reduced = reduce_loss(loss)

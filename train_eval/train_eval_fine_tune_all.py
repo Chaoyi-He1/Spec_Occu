@@ -19,6 +19,8 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
                     ALL_optimizer: torch.optim.Optimizer, 
                     device: torch.device, epoch: int, max_norm: float = 0.01, 
                     scaler=None, freeze_encoder: bool =False):
+    torch.autograd.set_detect_anomaly(True)
+
     encoder.train()
     diff_model.train()
     T2F_model.train()
@@ -40,66 +42,47 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             features = encoder(history)
-            BCELoss, _ = diff_criterion.get_loss_fine_tune(x_0=future, context=features, model=diff_model)
+            BCELoss, predict = diff_criterion.get_loss_fine_tune(x_0=future, context=features, model=diff_model)
         
             loss = BCELoss.mean()
             # F1score = F1_score(predict_label, future_labels)
 
         if torch.isnan(loss):
             raise ValueError('NaN loss detected')
-
-        # Backward
-        diff_optimizer.zero_grad()
-        if scaler is not None:
-            scaler.scale(loss).backward()
-        else:
-            loss.backward()
         
-        if max_norm > 0:
-            params = diff_model.parameters() if freeze_encoder \
-                else chain(encoder.parameters(), diff_model.parameters())
-            torch.nn.utils.clip_grad_norm_(params, max_norm)
-        
-        with torch.cuda.amp.autocast(enabled=scaler is not None), torch.no_grad():
-            features = encoder(history)
-            predict = diff_criterion.sample(num_points=future.shape[1], context=features, 
-                                            sample=1, bestof=False, step=10,
-                                            model=diff_model, point_dim=future.shape[-1], 
-                                            flexibility=0.0, ret_traj=False, sampling="ddpm")
-            predict = predict[0].detach() # / 50.0
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             predict_label = T2F_model(predict)
-            # print(torch.isnan(predict_label).any())
+            
             loss_T2F, acc_steps = T2F_criterion(predict_label, future_labels)
-            # print(loss_T2F.item())
+            
             acc = acc_steps.mean()
             F1score = F1_score(predict_label, future_labels)
             
         if torch.isnan(loss_T2F):
             raise ValueError('NaN loss detected')
         loss += loss_T2F
+        
+        # Backward
+        ALL_optimizer.zero_grad()
+        if scaler is not None:
+            scaler.scale(loss).backward()
+        else:
+            loss.backward()
+            
+        if max_norm > 0:
+            params = diff_model.parameters() if freeze_encoder \
+                else chain(encoder.parameters(), diff_model.parameters())
+            torch.nn.utils.clip_grad_norm_(params, max_norm)
             
         # reduce losses over all GPUs for logging purposes
         loss_reduced = reduce_loss(loss)
         acc_reduced = reduce_loss(acc)
-
-        # Backward
-        T2F_optimizer.zero_grad()
-        if scaler is not None:
-            scaler.scale(loss_T2F).backward()
-        else:
-            loss_T2F.backward()
-        
-        if max_norm > 0:
-            torch.nn.utils.clip_grad_norm_(T2F_model.parameters(), max_norm)
             
         if scaler is not None:
-            scaler.step(diff_optimizer)
-            scaler.step(T2F_optimizer)
+            scaler.step(ALL_optimizer)
             scaler.update()
         else:
-            diff_optimizer.step()
-            T2F_optimizer.step()
+            ALL_optimizer.step()
         # torch.autograd.set_detect_anomaly(False)
         
         # Update metric

@@ -25,7 +25,7 @@ from datasets.dataset import Diffusion_multi_env
 from models.diffusion import *
 from models.contrastive_model import *
 from models.Temp_to_Freq_model import *
-from train_eval.train_eval_fine_tune_diffusion import *
+from train_eval.train_eval_fine_tune_all import *
 from util.diffusion import *
 from util.Temp_to_Freq import Temporal_Freq_Loss
 
@@ -352,6 +352,8 @@ def main(args):
     diff_optimizer = torch.optim.Adam(params_to_optimize, lr=args.lr, weight_decay=args.weight_decay)
     T2F_optimizer = torch.optim.Adam(params_to_optimize_T2F, lr=args.lr, weight_decay=args.weight_decay) \
                     if not args.freeze_T2F else None
+    ALL_optimizer = torch.optim.Adam(list(params_to_optimize) + list(params_to_optimize_T2F), 
+                                    lr=args.lr, weight_decay=args.weight_decay)
     lf = lambda x: ((1 + math.cos(x * math.pi / args.epochs)) / 2) * (1 - args.lrf) + args.lrf  # cosine
     scheduler = torch.optim.lr_scheduler.LambdaLR(diff_optimizer, lr_lambda=lf)
     scheduler_T2F = torch.optim.lr_scheduler.LambdaLR(T2F_optimizer, lr_lambda=lf) \
@@ -372,7 +374,7 @@ def main(args):
         # train
         train_loss_dict = train_one_epoch(encoder=encoder, diff_model=diffusion_model, T2F_model=T2F_model,
                                           diff_criterion=diffusion_util, T2F_criterion=T2F_criterion,
-                                          data_loader=data_loader_train, diff_optimizer=diff_optimizer, 
+                                          data_loader=data_loader_train, diff_optimizer=diff_optimizer, ALL_optimizer=ALL_optimizer,
                                           T2F_optimizer=T2F_optimizer, epoch=epoch, scaler=scaler, device=device, 
                                           freeze_encoder=args.freeze_encoder)
         scheduler.step()

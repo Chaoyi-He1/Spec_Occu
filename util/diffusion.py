@@ -63,7 +63,7 @@ class Diffusion_utils(nn.Module):
         e_theta = model(c0 * x_0 + c1 * e_rand, beta=beta, context=context, t=t)
         loss = F.mse_loss(e_theta, e_rand, reduction='none')
         loss = loss.mean(dim=(0, -2, -1))
-        return loss
+        return loss, e_theta
 
 
     def sample(self, num_points, context, sample, bestof, model: nn.Module,
