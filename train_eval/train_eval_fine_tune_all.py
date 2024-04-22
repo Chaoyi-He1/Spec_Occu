@@ -45,12 +45,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             BCELoss, predict = diff_criterion.get_loss_fine_tune(x_0=future, context=features, model=diff_model)
         
             loss = BCELoss.mean()
-            # F1score = F1_score(predict_label, future_labels)
-
-        if torch.isnan(loss):
-            raise ValueError('NaN loss detected')
         
-        with torch.cuda.amp.autocast(enabled=scaler is not None):
             predict_label = T2F_model(predict)
             
             loss_T2F, acc_steps = T2F_criterion(predict_label, future_labels)
