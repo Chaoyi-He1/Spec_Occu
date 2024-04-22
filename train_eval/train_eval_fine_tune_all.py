@@ -71,7 +71,7 @@ def train_one_epoch(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             
         if max_norm > 0:
             params = diff_model.parameters() if freeze_encoder \
-                else chain(encoder.parameters(), diff_model.parameters())
+                else chain(encoder.parameters(), diff_model.parameters(), T2F_model.parameters())
             torch.nn.utils.clip_grad_norm_(params, max_norm)
             
         # reduce losses over all GPUs for logging purposes
@@ -166,11 +166,16 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     # Compute the TPR and FPR for different thresholds
     TPRs = []
     FPRs = []
+    ths = []
     for threshold in np.linspace(0, 80, 100):
         all_predictions_label = (all_predictions >= threshold).astype(int)
         all_predictions_label = np.round(all_predictions_label.sum(axis=0) / repeat)
         
         # Compute the precision and recall
+        # identify if all_true_labels just contains 0 or 1
+        if np.all(all_true_labels == 0) or np.all(all_true_labels == 1):
+            print("All true labels are the same, cannot compute the precision and recall")
+            break
         TP = (all_predictions_label * all_true_labels).sum()
         TN = ((1 - all_predictions_label) * (1 - all_true_labels)).sum()
         FP = (all_predictions_label * (1 - all_true_labels)).sum()
@@ -183,6 +188,7 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         
         TPRs.append(TPR)
         FPRs.append(FPR)
+        ths.append(threshold)
     
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
@@ -192,8 +198,8 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.plot(FPRs, TPRs, label="ROC curve for the model")
-    for i, txt in enumerate(np.linspace(10, 80, 100)):
-        ax.annotate("{:.2f}".format(txt), (FPRs[i] + 0.1, TPRs[i] - 0.1), fontsize=8)
+    for th, FPR, TPR in zip(ths, FPRs, TPRs):
+        ax.annotate("{:.2f}".format(th), (FPR + 0.1, TPR - 0.1), fontsize=8)
     ax.set_xlabel("FP Rate")
     ax.set_ylabel("TP Rate")
     ax.set_title("ROC curve")
