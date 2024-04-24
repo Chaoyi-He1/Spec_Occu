@@ -41,7 +41,7 @@ def get_args_parser():
     parser.add_argument('--eval', action='store_true', help='only evaluate model on validation set')
 
     # Model parameters
-    parser.add_argument('--resume', type=str, default='weights/diffusion/cache/model_443.pth', help="initial weights path")  # weights/model_940.pth
+    parser.add_argument('--resume', type=str, default='weights/fine_tune/model_459.pth', help="initial weights path")  # weights/model_940.pth
     parser.add_argument('--encoder-path', type=str, default='', help="encoder path")
     parser.add_argument('--T2F-path', type=str, default='weights/T2F/conv/model_499.pth', help="T2F path")
     parser.add_argument('--diffusion-path', type=str, default='weights/diffusion/', help="diffusion path")
