@@ -6,7 +6,6 @@ import torch
 from torch import nn
 
 
-@torch.no_grad()
 class PositionEmbeddingSine(nn.Module):
     """
     This is a more standard version of the position embedding, very similar to the one
@@ -23,6 +22,7 @@ class PositionEmbeddingSine(nn.Module):
             scale = 2 * math.pi
         self.scale = scale
 
+    @torch.no_grad()
     def forward(self, x, mask=None):
         l, dim = x.shape[-2:]
         # assert dim == self.num_pos_feats and l <= 100, \
