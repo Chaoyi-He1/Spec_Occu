@@ -17,10 +17,10 @@ class Steps_BCELoss(nn.Module):
         loss = self.bce(pred, targets) 
         
         # focus on the FP (false positive) and FN (false negative) errors
-        FP_position = torch.logical_and(F.sigmoid(pred) < 0.5, targets == 1)
-        FN_position = torch.logical_and(F.sigmoid(pred) > 0.5, targets == 0)
-        loss[FP_position] *= 5
-        loss[FN_position] *= 5
+        # FP_position = torch.logical_and(F.sigmoid(pred) < 0.5, targets == 1)
+        # FN_position = torch.logical_and(F.sigmoid(pred) > 0.5, targets == 0)
+        # loss[FP_position] *= 5
+        # loss[FN_position] *= 5
         
         return loss.mean()
 
