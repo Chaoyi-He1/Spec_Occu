@@ -266,8 +266,7 @@ def main(args):
     start_time = time.time()
     
     # Training set evaluation
-    (train_history, train_hist_labels, 
-     train_future, train_future_labels, 
+    (_, _, _, 
      train_loss_dict) = evaluate(encoder=encoder, diff_model=diffusion_model, 
                                  T2F_model=T2F_model, diff_criterion=diffusion_util, 
                                  T2F_criterion=T2F_criterion, data_loader=data_loader_train, 
@@ -275,8 +274,7 @@ def main(args):
     # Visualize the results for training set
 
     # Testing set evaluation
-    (val_history, val_hist_labels, 
-     val_future, val_future_labels, 
+    (_, _, _, 
      val_loss_dict) = evaluate(encoder=encoder, diff_model=diffusion_model, 
                                T2F_model=T2F_model, diff_criterion=diffusion_util, 
                                T2F_criterion=T2F_criterion, data_loader=data_loader_val, 

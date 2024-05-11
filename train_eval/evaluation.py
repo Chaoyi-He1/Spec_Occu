@@ -28,9 +28,7 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     metric_logger.add_meter('F1_score', SmoothedValue(window_size=10, fmt='{value:.6f}'))
     header = 'Test:'
     
-    best_history, best_hist_labels, best_future, best_future_labels = None, None, None, None
-    best_acc, best_F1score = 0, 0
-    acc_batch, F1 = [], []
+    all_predictions, all_true_labels = [], []
     
     for _, (history, hist_labels,
             future, future_labels) in enumerate(metric_logger.log_every(data_loader, 10, header)):
@@ -43,54 +41,91 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
         with torch.no_grad(), torch.cuda.amp.autocast(enabled=scaler is not None):
             features = encoder(history)
             predicts = diff_criterion.sample(num_points=future.shape[1], context=features,
-                                            sample=10, bestof=False, step=10, flexibility=0.0, 
+                                            sample=20, bestof=False, step=10, flexibility=0.0, 
                                             model=diff_model, point_dim=future.shape[-1], 
-                                            ret_traj=False, sampling="ddpm") / 50
-            # predicts -= predicts.mean(dim=-1, keepdim=True)
-            predict_labels = [T2F_model(predict) for predict in predicts]
-            acc_steps, acc, F1score, predict_probs = calculate_prob_cloud(predict_labels, future_labels)
-            BCELoss, _ = zip(*[T2F_criterion(predict_label, future_labels) for predict_label in predict_labels])
+                                            ret_traj=False, sampling="ddpm")
             
-        acc_batch.append(acc.item())
-        F1.append(F1score.mean().item())
-        if F1score.mean() > best_F1score and acc > best_acc:
-            best_history, best_hist_labels, best_future, best_future_labels = history, hist_labels, future, future_labels
-            best_acc, best_F1score = acc, F1score.mean()
+            predict_labels = torch.stack([T2F_model(predict) for predict in predicts], dim=0)  
             
-        metric_logger.update(loss=torch.stack(BCELoss).mean().item(), 
-                             acc=acc.item(), 
-                             F1_score=F1score.mean().item())
-    print("Averaged stats:", metric_logger)
-    # Visualize the best prediction
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    plot_predictions(ax, fig, predict_probs, future_labels)
-    print("average acc: ", sum(acc_batch) / len(acc_batch))
-    print("average F1 score: ", sum(F1) / len(F1))
-    return best_history, best_hist_labels, best_future, best_future_labels, \
+            all_predictions.append(predict_labels.detach().cpu())
+            all_true_labels.append(future_labels.detach().cpu())
+    all_predictions = torch.cat(all_predictions, dim=0)
+    all_true_labels = torch.cat(all_true_labels, dim=0)
+    best_index = calculate_prob_cloud(all_predictions, all_true_labels)
+    return best_index, all_predictions[:, best_index, ...], all_true_labels[best_index, ...], \
            {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
 
-def calculate_prob_cloud(predict_labels: List[Tensor], future_labels: Tensor, 
-                         threshold: float = 0.2):
-    predict_labels = torch.stack(predict_labels)
-    predict_labels[predict_labels < threshold] = 0
-    predict_labels[predict_labels >= threshold] = 1
-
-    sample_size, batch_size, num_time_steps, num_classes = predict_labels.shape
-    predict_probs = predict_labels.sum(dim=0) / sample_size
-    predict_labels = predict_probs.round()
-
+def calculate_prob_cloud(predicts: Tensor, future_labels: Tensor):
+    # predict_labels (num_samples, batch_size, num_time_steps, num_classes)
+    # Sweep the threshold from 0 to 80 with 100 steps to find the best threshold for each prediction in the batch
+    # the best threshold is the one that at the left top corner of the ROC curve (diagonal line of the ROC curve)
+    predicts = torch.stack(predicts, dim=0)
+    best_thresholds = np.zeros(predicts.shape[1])
+    best_rate = np.zeros(predicts.shape[1])
+    best_acc = np.zeros(predicts.shape[1])
     
-    # calculate the accuracy and F1 score
-    acc_steps = (predict_labels == future_labels).sum(dim=2).sum(dim=0) / (batch_size * num_classes)
-    acc = acc_steps.mean()
-    tp = torch.logical_and(predict_labels == 1, future_labels == 1).sum(dim=2).sum(dim=0)
-    fp = torch.logical_and(predict_labels == 1, future_labels == 0).sum(dim=2).sum(dim=0)
-    fn = torch.logical_and(predict_labels == 0, future_labels == 1).sum(dim=2).sum(dim=0)
-    F1scores = tp / (tp + 0.5 * (fp + fn))
-    return acc_steps, acc, F1scores, predict_probs
+    for threshold in np.linspace(10, 80, 100):
+        prediction_labels = torch.round((predicts > threshold).float().mean(dim=0))
+        
+        # find if the prediction at this threshold is the best in the ROC curve for each prediction in the batch
+        TP = (prediction_labels * future_labels).sum(dim=(0, 2, 3))
+        TN = ((1 - prediction_labels) * (1 - future_labels)).sum(dim=(0, 2, 3))
+        FP = (prediction_labels * (1 - future_labels)).sum(dim=(0, 2, 3))
+        FN = ((1 - prediction_labels) * future_labels).sum(dim=(0, 2, 3))
 
+        # calculate the TPR and FPR for each prediction in the batch at this threshold
+        # and find if it is at the diagonal line of the ROC curve from the left top corner to the right bottom corner
+        TPR = TP / (TP + FN)
+        FPR = FP / (FP + TN)
+        
+        # chech if the TPR and FPR make the prediction at the left top corner of the ROC curve
+        better_ratio_mask = (TPR >= -FPR + 1) and (TPR / FPR > best_rate)
+        best_rate[better_ratio_mask] = (TPR / FPR).cpu().numpy()
+        best_thresholds[better_ratio_mask] = threshold
+        best_acc[better_ratio_mask] = ((TP + TN) / (TP + TN + FP + FN)).cpu().numpy()
+    
+    # find the best one in the batch
+    best_index = np.argmax(best_acc)
+    #generate the probability cloud for the best prediction in the batch
+    best_threshold = best_thresholds[best_index]
+    best_prob_cloud = (predicts[:, best_index, :, :] > best_threshold).float().mean(dim=0)
+    # plot the probability cloud and the ground as a heatmap in two subplots
+    fig = plt.figure()
+    ax = fig.add_subplot(121)
+    scatter = ax.scatter(
+        np.tile(np.arange(best_prob_cloud.shape[1]), best_prob_cloud.shape[0]),  # X-axis values
+        np.repeat(np.arange(best_prob_cloud.shape[0]), best_prob_cloud.shape[1]),  # Y-axis values
+        c=best_prob_cloud.flatten(),  # Color based on data values
+        cmap='Blues',  # Colormap ('Blues' for dark to bright blue)
+        marker='s',  # Marker style (square)
+        s=50,  # Marker size
+    )
+    ax.set_xlabel('X-axis')
+    ax.set_ylabel('Y-axis')
+    ax.set_title('2D Probability Cloud')
+    cbar = fig.colorbar(scatter, ax=ax, label='Probability')
+    ax.set_aspect('equal', adjustable='box')
+    
+    ax = fig.add_subplot(122)
+    scatter = ax.scatter(
+        np.tile(np.arange(future_labels.shape[3]), future_labels.shape[2]),  # X-axis values
+        np.repeat(np.arange(future_labels.shape[2]), future_labels.shape[3]),  # Y-axis values
+        c=future_labels[best_index].flatten(),  # Color based on data values
+        cmap='Blues',  # Colormap ('Blues' for dark to bright blue)
+        marker='s',  # Marker style (square)
+        s=50,  # Marker size
+    )
+    ax.set_xlabel('X-axis')
+    ax.set_ylabel('Y-axis')
+    ax.set_title('2D Ground Truth')
+    cbar = fig.colorbar(scatter, ax=ax, label='Probability')
+    ax.set_aspect('equal', adjustable='box')
+    
+    #save the figure
+    plt.savefig("prob_cloud.png")
+    return best_index
+    
 
 def CPC_test(encoder: torch.nn.Module, diff_model: torch.nn.Module, 
              T2F_model: torch.nn.Module, diff_criterion: Diffusion_utils, 
