@@ -86,7 +86,9 @@ def calculate_prob_cloud(predicts: Tensor, future_labels: Tensor, is_train=False
         best_acc[better_ratio_mask] = ((TP + TN) / (TP + TN + FP + FN))[better_ratio_mask]
     
     # find the top 10 best in the batch
-    best_10_index = torch.argsort(best_rate, descending=True)[:10].cpu().numpy()
+    best_100_index = torch.argsort(best_rate, descending=True)[:100].cpu().numpy()
+    # randomly select 10 from the top 100 best
+    best_10_index = np.random.choice(best_100_index, 10)
     for i, best_index in enumerate(best_10_index):
         #generate the probability cloud for the best prediction in the batch
         best_threshold = best_thresholds[best_index]
@@ -125,9 +127,9 @@ def calculate_prob_cloud(predicts: Tensor, future_labels: Tensor, is_train=False
         
         #save the figure
         if is_train:
-            plt.savefig("prob_cloud_train_{}.png".format(i))
+            plt.savefig("prob_cloud/prob_cloud_train_{}.png".format(i))
         else:
-            plt.savefig("prob_cloud_test_{}.png".format(i))
+            plt.savefig("prob_cloud/prob_cloud_test_{}.png".format(i))
     return best_10_index
     
 
