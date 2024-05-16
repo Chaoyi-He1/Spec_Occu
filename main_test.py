@@ -41,7 +41,7 @@ def get_args_parser():
     parser.add_argument('--eval', action='store_true', help='only evaluate model on validation set')
 
     # Model parameters
-    parser.add_argument('--resume', type=str, default='weights/fine_tune/model_275.pth', help="initial weights path")  # weights/model_940.pth
+    parser.add_argument('--resume', type=str, default='weights/fine_tune/model_452.pth', help="initial weights path")  # weights/model_940.pth
     parser.add_argument('--encoder-path', type=str, default='', help="encoder path")
     parser.add_argument('--T2F-path', type=str, default='weights/T2F/conv/', help="T2F path")
     parser.add_argument('--diffusion-path', type=str, default='weights/diffusioni/', help="diffusion path")
@@ -80,8 +80,6 @@ def get_args_parser():
 
 def main(args):
     print(args)
-    print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
-    tb_writer = SummaryWriter(comment=args.name)
     
     device = torch.device(args.device)
     if "cuda" not in args.device:
@@ -266,37 +264,18 @@ def main(args):
     start_time = time.time()
     
     # Training set evaluation
-    (_, _, _, 
-     train_loss_dict) = evaluate(encoder=encoder, diff_model=diffusion_model, 
-                                 T2F_model=T2F_model, diff_criterion=diffusion_util, 
-                                 T2F_criterion=T2F_criterion, data_loader=data_loader_train, 
-                                 device=device, scaler=scaler)
+    (_, _, _) = evaluate(encoder=encoder, diff_model=diffusion_model, 
+                         T2F_model=T2F_model, diff_criterion=diffusion_util, 
+                         T2F_criterion=T2F_criterion, data_loader=data_loader_train, 
+                         device=device, scaler=scaler, is_train=True)
     # Visualize the results for training set
 
     # Testing set evaluation
-    (_, _, _, 
-     val_loss_dict) = evaluate(encoder=encoder, diff_model=diffusion_model, 
-                               T2F_model=T2F_model, diff_criterion=diffusion_util, 
-                               T2F_criterion=T2F_criterion, data_loader=data_loader_val, 
-                               device=device, scaler=scaler)
+    (_, _, _) = evaluate(encoder=encoder, diff_model=diffusion_model, 
+                         T2F_model=T2F_model, diff_criterion=diffusion_util, 
+                         T2F_criterion=T2F_criterion, data_loader=data_loader_val, 
+                         device=device, scaler=scaler, is_train=False)
     # Visualize the results for testing set
-    
-    # write results
-    log_stats = {**{f'train_{k}': v for k, v in train_loss_dict.items()},
-                 **{f'test_{k}': v for k, v in val_loss_dict.items()}}
-    if args.output_dir and utils.is_main_process():
-        with (output_dir).open("a") as f:
-            f.write(json.dumps(log_stats) + "\n")
-    
-    # write tensorboard
-    if utils.is_main_process():
-        if tb_writer:
-            items = {
-                **{f'train_{k}': v for k, v in train_loss_dict.items()},
-                **{f'test_{k}': v for k, v in val_loss_dict.items()},
-            }
-            for k, v in items.items():
-                tb_writer.add_scalar(k, v, 0)
     
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))

@@ -13,8 +13,8 @@
             "args": [
                 "--nproc_per_node", "2", 
                 "--use_env",
-                "main_whole_fine_tune.py",
-                "--freeze-T2F",
+                "main_test.py",
+                // "--freeze-T2F",
             ]
         }
     ]
