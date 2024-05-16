@@ -85,49 +85,50 @@ def calculate_prob_cloud(predicts: Tensor, future_labels: Tensor, is_train=False
         best_thresholds[better_ratio_mask] = threshold
         best_acc[better_ratio_mask] = ((TP + TN) / (TP + TN + FP + FN))[better_ratio_mask]
     
-    # find the best one in the batch
-    best_index = np.argmax(best_acc)
-    #generate the probability cloud for the best prediction in the batch
-    best_threshold = best_thresholds[best_index]
-    best_prob_cloud = (predicts[:, best_index, :, :] > best_threshold).float().mean(dim=0)
-    # plot the probability cloud and the ground as a heatmap in two subplots
-    fig = plt.figure()
-    ax = fig.add_subplot(121)
-    scatter = ax.scatter(
-        np.tile(np.arange(best_prob_cloud.shape[1]), best_prob_cloud.shape[0]),  # X-axis values
-        np.repeat(np.arange(best_prob_cloud.shape[0]), best_prob_cloud.shape[1]),  # Y-axis values
-        c=best_prob_cloud.flatten(),  # Color based on data values
-        cmap='Blues',  # Colormap ('Blues' for dark to bright blue)
-        marker='s',  # Marker style (square)
-        s=50,  # Marker size
-    )
-    ax.set_xlabel('X-axis')
-    ax.set_ylabel('Y-axis')
-    ax.set_title('2D Probability Cloud')
-    cbar = fig.colorbar(scatter, ax=ax, label='Probability')
-    ax.set_aspect('equal', adjustable='box')
-    
-    ax = fig.add_subplot(122)
-    scatter = ax.scatter(
-        np.tile(np.arange(future_labels.shape[2]), future_labels.shape[1]),  # X-axis values
-        np.repeat(np.arange(future_labels.shape[1]), future_labels.shape[2]),  # Y-axis values
-        c=future_labels[best_index].flatten(),  # Color based on data values
-        cmap='Blues',  # Colormap ('Blues' for dark to bright blue)
-        marker='s',  # Marker style (square)
-        s=50,  # Marker size
-    )
-    ax.set_xlabel('Frequency')
-    ax.set_ylabel('Time Frames')
-    ax.set_title('2D Ground Truth')
-    cbar = fig.colorbar(scatter, ax=ax, label='Probability')
-    ax.set_aspect('equal', adjustable='box')
-    
-    #save the figure
-    if is_train:
-        plt.savefig("prob_cloud_train.png")
-    else:
-        plt.savefig("prob_cloud_test.png")
-    return best_index
+    # find the top 10 best in the batch
+    best_10_index = torch.argsort(best_rate, descending=True)[:10].cpu().numpy()
+    for i, best_index in enumerate(best_10_index):
+        #generate the probability cloud for the best prediction in the batch
+        best_threshold = best_thresholds[best_index]
+        best_prob_cloud = (predicts[:, best_index, :, :] > best_threshold).float().mean(dim=0)
+        # plot the probability cloud and the ground as a heatmap in two subplots
+        fig = plt.figure()
+        ax = fig.add_subplot(121)
+        scatter = ax.scatter(
+            np.tile(np.arange(best_prob_cloud.shape[1]), best_prob_cloud.shape[0]),  # X-axis values
+            np.repeat(np.arange(best_prob_cloud.shape[0]), best_prob_cloud.shape[1]),  # Y-axis values
+            c=best_prob_cloud.flatten(),  # Color based on data values
+            cmap='Blues',  # Colormap ('Blues' for dark to bright blue)
+            marker='s',  # Marker style (square)
+            s=50,  # Marker size
+        )
+        ax.set_xlabel('X-axis')
+        ax.set_ylabel('Y-axis')
+        ax.set_title('2D Probability Cloud')
+        cbar = fig.colorbar(scatter, ax=ax, label='Probability')
+        ax.set_aspect('equal', adjustable='box')
+        
+        ax = fig.add_subplot(122)
+        scatter = ax.scatter(
+            np.tile(np.arange(future_labels.shape[2]), future_labels.shape[1]),  # X-axis values
+            np.repeat(np.arange(future_labels.shape[1]), future_labels.shape[2]),  # Y-axis values
+            c=future_labels[best_index].flatten(),  # Color based on data values
+            cmap='Blues',  # Colormap ('Blues' for dark to bright blue)
+            marker='s',  # Marker style (square)
+            s=50,  # Marker size
+        )
+        ax.set_xlabel('Frequency')
+        ax.set_ylabel('Time Frames')
+        ax.set_title('2D Ground Truth')
+        cbar = fig.colorbar(scatter, ax=ax, label='Probability')
+        ax.set_aspect('equal', adjustable='box')
+        
+        #save the figure
+        if is_train:
+            plt.savefig("prob_cloud_train_{}.png".format(i))
+        else:
+            plt.savefig("prob_cloud_test_{}.png".format(i))
+    return best_10_index
     
 
 def CPC_test(encoder: torch.nn.Module, diff_model: torch.nn.Module, 
