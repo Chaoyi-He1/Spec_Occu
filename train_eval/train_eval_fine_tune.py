@@ -183,7 +183,7 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     # Compute the TPR and FPR for different thresholds
     TPRs = []
     FPRs = []
-    for threshold in np.linspace(0, 80, 100):
+    for threshold in np.linspace(10, 80, 100):
         all_predictions_label = (all_predictions >= threshold).astype(int)
         all_predictions_label = np.round(all_predictions_label.sum(axis=0) / repeat)
         
@@ -209,8 +209,8 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.plot(FPRs, TPRs, label="ROC curve for the model")
-    for i, txt in enumerate(np.linspace(10, 80, 100)):
-        ax.annotate("{:.2f}".format(txt), (FPRs[i] + 0.1, TPRs[i] - 0.1), fontsize=8)
+    # for i, txt in enumerate(np.linspace(10, 80, 100)):
+    #     ax.annotate("{:.2f}".format(txt), (FPRs[i] + 0.1, TPRs[i] - 0.1), fontsize=8)
     ax.set_xlabel("FP Rate")
     ax.set_ylabel("TP Rate")
     ax.set_title("ROC curve")

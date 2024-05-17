@@ -104,8 +104,8 @@ def calculate_prob_cloud(predicts: Tensor, future_labels: Tensor, is_train=False
             marker='s',  # Marker style (square)
             s=50,  # Marker size
         )
-        ax.set_xlabel('X-axis')
-        ax.set_ylabel('Y-axis')
+        ax.set_xlabel('Frequency')
+        ax.set_ylabel('Time Frames')
         ax.set_title('2D Probability Cloud')
         cbar = fig.colorbar(scatter, ax=ax, label='Probability')
         ax.set_aspect('equal', adjustable='box')
