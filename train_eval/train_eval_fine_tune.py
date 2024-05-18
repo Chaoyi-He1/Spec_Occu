@@ -183,7 +183,7 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     # Compute the TPR and FPR for different thresholds
     TPRs = []
     FPRs = []
-    for threshold in np.linspace(10, 80, 100):
+    for threshold in np.linspace(10, 80, 500):
         all_predictions_label = (all_predictions >= threshold).astype(int)
         all_predictions_label = np.round(all_predictions_label.sum(axis=0) / repeat)
         
