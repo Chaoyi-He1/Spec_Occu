@@ -93,28 +93,33 @@ def calculate_prob_cloud(predicts: Tensor, future_labels: Tensor, is_train=False
         #generate the probability cloud for the best prediction in the batch
         best_threshold = best_thresholds[best_index]
         best_prob_cloud = (predicts[:, best_index, :, :] > best_threshold).float().mean(dim=0)
+        best_prob_cloud = best_prob_cloud.T
+        # Frequency values from 5.25GHz with a step of 20MHz
+        frequency = np.arange(5.25, 5.25 + best_prob_cloud.shape[0] * 0.02, 0.02)
+        # Time values with a step of 2 * 10^-7 seconds
+        time = np.arange(0, best_prob_cloud.shape[1] * 2e-6, 2e-6)
         # plot the probability cloud and the ground as a heatmap in two subplots
         fig = plt.figure()
         ax = fig.add_subplot(121)
         scatter = ax.scatter(
-            np.tile(np.arange(best_prob_cloud.shape[1]), best_prob_cloud.shape[0]),  # X-axis values
-            np.repeat(np.arange(best_prob_cloud.shape[0]), best_prob_cloud.shape[1]),  # Y-axis values
+            np.tile(frequency, best_prob_cloud.shape[1]),  # X-axis values
+            np.repeat(time, best_prob_cloud.shape[0]),  # Y-axis values
             c=best_prob_cloud.flatten(),  # Color based on data values
             cmap='Blues',  # Colormap ('Blues' for dark to bright blue)
             marker='s',  # Marker style (square)
-            s=50,  # Marker size
+            s=50  # Marker size
         )
         ax.set_xlabel('Frequency')
         ax.set_ylabel('Time Frames')
         ax.set_title('2D Probability Cloud')
         cbar = fig.colorbar(scatter, ax=ax, label='Probability')
-        ax.set_aspect('equal', adjustable='box')
+        ax.set_aspect(aspect=(32/8), adjustable='box')
         
         ax = fig.add_subplot(122)
         scatter = ax.scatter(
-            np.tile(np.arange(future_labels.shape[2]), future_labels.shape[1]),  # X-axis values
-            np.repeat(np.arange(future_labels.shape[1]), future_labels.shape[2]),  # Y-axis values
-            c=future_labels[best_index].flatten(),  # Color based on data values
+            np.tile(frequency, best_prob_cloud.shape[1]),  # X-axis values
+            np.repeat(time, best_prob_cloud.shape[0]),  # Y-axis values
+            c=future_labels[best_index].T.flatten(),  # Color based on data values
             cmap='Blues',  # Colormap ('Blues' for dark to bright blue)
             marker='s',  # Marker style (square)
             s=50,  # Marker size
@@ -123,7 +128,7 @@ def calculate_prob_cloud(predicts: Tensor, future_labels: Tensor, is_train=False
         ax.set_ylabel('Time Frames')
         ax.set_title('2D Ground Truth')
         cbar = fig.colorbar(scatter, ax=ax, label='Probability')
-        ax.set_aspect('equal', adjustable='box')
+        ax.set_aspect(aspect=(32/8), adjustable='box')
         
         #save the figure
         if is_train:
