@@ -715,7 +715,7 @@ class Special_case_multi_env(Dataset):
             if self.cache:
                 # start_index = np.random.randint(0,
                 #                                 data["data_frame_I"].shape[0] - 20000)
-                # label = data["label_frame"]
+                label = data["label_frame"]
                 # find all the start index where the rows of label are changing from two ones to four ones or vice versa
                 start_index = np.where(np.abs(np.diff(np.sum(label, axis=1))) == 2)[0]
                 
