@@ -21,7 +21,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 import torch.multiprocessing
 
 import util.misc as utils
-from datasets.dataset import Diffusion_multi_env
+from datasets.dataset import Diffusion_multi_env, Special_case_multi_env
 from models.diffusion import *
 from models.contrastive_model import *
 from models.Temp_to_Freq_model import *
@@ -121,18 +121,18 @@ def main(args):
 
     # dataset generate
     print("Diffusion dataset generating...")
-    dataset_train = Diffusion_multi_env(data_folder_path=args.train_path, 
-                                        cache=args.cache_data,
-                                        past_steps=cfg["contrast_sequence_length"],
-                                        future_steps=args.time_step,
-                                        train=True,
-                                        temp_dim=cfg["Temporal_dim"])
-    dataset_val = Diffusion_multi_env(data_folder_path=args.val_path,
-                                      cache=args.cache_data,
-                                      past_steps=cfg["contrast_sequence_length"],
-                                      future_steps=args.time_step,
-                                      train=False,
-                                      temp_dim=cfg["Temporal_dim"])
+    dataset_train = Special_case_multi_env(data_folder_path=args.train_path, 
+                                           cache=args.cache_data,
+                                           past_steps=cfg["contrast_sequence_length"],
+                                           future_steps=args.time_step,
+                                           train=True,
+                                           temp_dim=cfg["Temporal_dim"])
+    dataset_val = Special_case_multi_env(data_folder_path=args.val_path,
+                                         cache=args.cache_data,
+                                         past_steps=cfg["contrast_sequence_length"],
+                                         future_steps=args.time_step,
+                                         train=False,
+                                         temp_dim=cfg["Temporal_dim"])
     
     if args.distributed:
         sampler_train = torch.utils.data.distributed.DistributedSampler(dataset_train)

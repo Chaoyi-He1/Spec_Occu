@@ -176,16 +176,17 @@ class Diffusion_utils(nn.Module):
 def compute_batch_statistics(predictions, gt_future):
     """
     Args:
-        predictions: (R, B, N, d), the generated future signal from the model
-        gt_future: (B, N, d), the ground truth future signal
+        predictions: (R, B, N, c, d), the generated future signal from the model
+        gt_future: (B, N, c, d), the ground truth future signal
     ADE error: average displacement error
     FDE error: final displacement error
     """
     r = predictions.shape[0]
-    errors = torch.sqrt(((predictions.sum(dim=0) / r - 
-                          gt_future)**2).sum(dim=(-2, -1)))  # (B, N)
+    gt_future = gt_future.unsqueeze(0)
+    errors = torch.sqrt(((predictions.sum(dim=0) - 
+                          gt_future)**2).sum(dim=(-2, -1))).mean(dim=0) / 2048  # (r, B, N)
     ADE = errors.mean(dim=1)  # (B, )
     FDE = errors[:, -1].contiguous()  # (B, )
-    ADE_percents = ADE / torch.sqrt((gt_future**2).sum(dim=(-2, -1))).mean(dim=1)
-    FDE_percents = FDE / (torch.sqrt((gt_future**2).sum(dim=(-2, -1)))[:, -1])
-    return ADE, FDE, ADE_percents, FDE_percents.contiguous()
+    ADE_percents = ADE / torch.sqrt((gt_future**2).sum(dim=(-2, -1))).mean(dim=2).squeeze(0)
+    FDE_percents = FDE / (torch.sqrt((gt_future**2).sum(dim=(-2, -1)))[0, :, -1])
+    return ADE, FDE, ADE_percents, FDE_percents

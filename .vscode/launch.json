@@ -8,12 +8,12 @@
             "name": "Python: Current File",
             "type": "debugpy",
             "request": "launch",
-            "module": "torch.distributed.launch",
+            "program": "/home/grads/c/chaoyi_he/Desktop/python3.8_env/bin/torchrun",
             "console": "integratedTerminal",
+            "justMyCode": true,
             "args": [
                 "--nproc_per_node", "2", 
-                "--use_env",
-                "main_test.py",
+                "main_diffusion.py",
                 // "--freeze-T2F",
             ]
         }
