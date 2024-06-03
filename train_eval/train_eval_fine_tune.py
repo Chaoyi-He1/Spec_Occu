@@ -178,8 +178,8 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     
     # Transfer the all_predictions from list to tensor and compute the precision and recall for different thresholds, plot the ROC curve
     # Concat the all_predictions among the batch dimension
-    all_predictions = torch.concatenate(all_predictions, dim=1).numpy()
-    all_true_labels = torch.concatenate(all_true_labels, dim=0).numpy()
+    all_predictions = torch.cat(all_predictions, dim=1).numpy()
+    all_true_labels = torch.cat(all_true_labels, dim=0).numpy()
     # Compute the TPR and FPR for different thresholds
     TPRs = []
     FPRs = []
