@@ -25,7 +25,7 @@ from datasets.dataset import Diffusion_multi_env, Special_case_multi_env
 from models.diffusion import *
 from models.contrastive_model import *
 from models.Temp_to_Freq_model import *
-from train_eval.train_eval_fine_tune import *
+from train_eval.train_eval_fine_tune_diffusion import *
 from util.diffusion import *
 from util.Temp_to_Freq import Temporal_Freq_Loss
 
@@ -41,10 +41,10 @@ def get_args_parser():
     parser.add_argument('--eval', action='store_true', help='only evaluate model on validation set')
 
     # Model parameters
-    parser.add_argument('--resume', type=str, default='weights/fine_tune/model_452.pth', help="initial weights path")  # weights/model_940.pth
+    parser.add_argument('--resume', type=str, default='weights/fine_tune/model_452', help="initial weights path")  # weights/model_940.pth
     parser.add_argument('--encoder-path', type=str, default='', help="encoder path")
-    parser.add_argument('--T2F-path', type=str, default='weights/T2F/conv/model_499', help="T2F path")
-    parser.add_argument('--diffusion-path', type=str, default='weights/diffusion/cache/model_443', help="diffusion path")
+    parser.add_argument('--T2F-path', type=str, default='weights/T2F/conv/model_499.pth', help="T2F path")
+    parser.add_argument('--diffusion-path', type=str, default='weights/diffusion/cache/model_443.pth', help="diffusion path")
     parser.add_argument('--time-step', type=int, default=32, help="number of time steps to predict")
     parser.add_argument('--hpy', type=str, default='cfg/cfg.yaml', help="hyper parameters path")
     parser.add_argument('--positional-embedding', default='learned', choices=('sine', 'learned'),
