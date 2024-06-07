@@ -29,6 +29,7 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     header = 'Test:'
     
     all_predictions, all_true_labels = [], []
+    all_history, all_hist_labels = [], []
     
     for _, (history, hist_labels,
             future, future_labels) in enumerate(metric_logger.log_every(data_loader, 10, header)):
@@ -49,14 +50,23 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
             
             all_predictions.append(predict_labels.detach().cpu())
             all_true_labels.append(future_labels.detach().cpu())
+            all_history.append(history.detach().cpu())
+            all_hist_labels.append(hist_labels.detach().cpu())
+            
     all_predictions = torch.cat(all_predictions, dim=1)
     all_true_labels = torch.cat(all_true_labels, dim=0)
-    best_index = calculate_prob_cloud(all_predictions, all_true_labels, is_train=is_train)
+    all_history = torch.cat(all_history, dim=0)
+    all_hist_labels = torch.cat(all_hist_labels, dim=0)
+    best_index = calculate_prob_cloud(all_predictions, all_true_labels, 
+                                      history=all_history, hist_labels=all_hist_labels,
+                                      is_train=is_train)
     return best_index, all_predictions[:, best_index, ...], all_true_labels[best_index, ...]
            
 
 
-def calculate_prob_cloud(predicts: Tensor, future_labels: Tensor, is_train=False):
+def calculate_prob_cloud(predicts: Tensor, future_labels: Tensor, 
+                         history: Tensor, hist_labels: Tensor,
+                         is_train=False):
     # predict_labels (num_samples, batch_size, num_time_steps, num_classes)
     # Sweep the threshold from 0 to 80 with 100 steps to find the best threshold for each prediction in the batch
     # the best threshold is the one that at the left top corner of the ROC curve (diagonal line of the ROC curve)
@@ -97,13 +107,20 @@ def calculate_prob_cloud(predicts: Tensor, future_labels: Tensor, is_train=False
         
         best_true_labels = future_labels[best_index, :, :]
         
+        best_history = history[best_index, :, :, :]
+        best_hist_labels = hist_labels[best_index, :, :]
+        
         #save the probability cloud matrix and the true labels matrix
         if is_train:
             np.savetxt(f"prob_cloud/train_best_prob_cloud_{i}.csv", best_prob_cloud.cpu().numpy(), delimiter=",")
             np.savetxt(f"prob_cloud/train_best_true_labels_{i}.csv", best_true_labels.cpu().numpy(), delimiter=",")
+            # np.savetxt(f"prob_cloud/train_best_history_{i}.csv", best_history.cpu().numpy(), delimiter=",")
+            np.savetxt(f"prob_cloud/train_best_hist_labels_{i}.csv", best_hist_labels.cpu().numpy(), delimiter=",")
         else:
             np.savetxt(f"prob_cloud/test_best_prob_cloud_{i}.csv", best_prob_cloud.cpu().numpy(), delimiter=",")
             np.savetxt(f"prob_cloud/test_best_true_labels_{i}.csv", best_true_labels.cpu().numpy(), delimiter=",")
+            # np.savetxt(f"prob_cloud/test_best_history_{i}.csv", best_history.cpu().numpy(), delimiter=",")
+            np.savetxt(f"prob_cloud/test_best_hist_labels_{i}.csv", best_hist_labels.cpu().numpy(), delimiter=",")
     return best_10_index
     
 
