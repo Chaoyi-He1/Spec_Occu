@@ -25,7 +25,7 @@ from datasets.dataset import Diffusion_multi_env, Special_case_multi_env
 from models.diffusion import *
 from models.contrastive_model import *
 from models.Temp_to_Freq_model import *
-from train_eval.train_eval_fine_tune_all import *
+from train_eval.train_eval_fine_tune import *
 from util.diffusion import *
 from util.Temp_to_Freq import Temporal_Freq_Loss
 
