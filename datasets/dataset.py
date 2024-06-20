@@ -728,7 +728,7 @@ class Special_case_multi_env(Dataset):
                 label, data_I, data_Q = [], [], []
                 for j in range(start_index.shape[0]):
                     # make the start index located randomly in the future_steps
-                    start_index[j] = start_index[j] - np.random.randint(0, self.future_steps) - self.past_steps
+                    start_index[j] = start_index[j] - np.random.randint(int(self.future_steps / 4), int(3 * self.future_steps / 4)) - self.past_steps
                     label.append(data["label_frame"][start_index[j]:start_index[j] + self.total_time_steps, ...])
                     data_I.append(data["data_frame_I"][start_index[j]:start_index[j] + self.total_time_steps, ...])
                     data_Q.append(data["data_frame_Q"][start_index[j]:start_index[j] + self.total_time_steps, ...])
