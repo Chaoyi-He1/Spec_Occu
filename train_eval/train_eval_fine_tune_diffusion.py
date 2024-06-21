@@ -204,9 +204,16 @@ def evaluate(encoder: torch.nn.Module, diff_model: torch.nn.Module,
     ax.set_title("ROC curve")
     plt.legend()
     plt.grid(True)
+    # Calculate the AUC, TPRs and FPRs are lists, print the AUC in the figure
+    AUC = np.trapz(np.asarray(TPRs), np.asarray(FPRs))
+    ax.text(0.6, 0.2, "AUC: {:.2f}".format(AUC), fontsize=18,
+            bbox=dict(facecolor='red', alpha=0.5))
+    
     # if fine_tune_roc folder does not exist, create it
     if not os.path.exists("fine_tune_roc"):
         os.makedirs("fine_tune_roc")
     plt.savefig("fine_tune_roc/ROC_curve_Epoch_{}.png".format(epoch))
+    # close the figure
+    plt.close()
 
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
