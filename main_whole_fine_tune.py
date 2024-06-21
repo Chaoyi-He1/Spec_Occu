@@ -121,13 +121,13 @@ def main(args):
 
     # dataset generate
     print("Diffusion dataset generating...")
-    dataset_train = Special_case_multi_env(data_folder_path=args.train_path, 
+    dataset_train = Diffusion_multi_env(data_folder_path=args.train_path, 
                                            cache=args.cache_data,
                                            past_steps=cfg["contrast_sequence_length"],
                                            future_steps=args.time_step,
                                            train=True,
                                            temp_dim=cfg["Temporal_dim"])
-    dataset_val = Special_case_multi_env(data_folder_path=args.val_path,
+    dataset_val = Diffusion_multi_env(data_folder_path=args.val_path,
                                          cache=args.cache_data,
                                          past_steps=cfg["contrast_sequence_length"],
                                          future_steps=args.time_step,
