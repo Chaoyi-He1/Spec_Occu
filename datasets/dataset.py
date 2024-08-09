@@ -408,7 +408,7 @@ class Temporal_to_Freq_data_multi_env(Dataset):
         return data_dict, label_dict, data_len, min_len
 
     def __len__(self):
-        return len(self.label_dict) * 768
+        return len(self.label_dict) * 50
 
     def __getitem__(self, index):
         """
