@@ -50,7 +50,7 @@ def get_args_parser():
     parser.add_argument('--lrf', default=0.01, type=float)
     parser.add_argument('--weight_decay', default=0, type=float)
     parser.add_argument('--epochs', default=500, type=int)
-    parser.add_argument('--batch_size', default=4, type=int)
+    parser.add_argument('--batch_size', default=8, type=int)
     parser.add_argument('--num_workers', default=8, type=int)
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N', help='start epoch')
 
@@ -59,7 +59,7 @@ def get_args_parser():
     parser.add_argument('--val-path', default='path/Data_files_with_label/val/', help='val dataset path')
     parser.add_argument('--cache-data', default=True, type=bool, help='cache data for faster training')
     parser.add_argument('--train-split', default=0.8, type=float, help='train split')
-    parser.add_argument('--output-dir', default='weights/T2F/conv', help='path where to save, empty for no saving')
+    parser.add_argument('--output-dir', default='weights/T2F/Transformer', help='path where to save, empty for no saving')
 
     # distributed training parameters
     parser.add_argument('--world_size', default=8, type=int, help='number of distributed processes')
