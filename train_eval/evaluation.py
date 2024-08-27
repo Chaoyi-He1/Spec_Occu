@@ -101,6 +101,8 @@ def calculate_prob_cloud(predicts: Tensor, future_labels: Tensor,
     # best_10_index = np.random.choice(best_100_index, 10)
     for i, best_index in enumerate(best_10_index):
         #generate the probability cloud for the best prediction in the batch
+        best_pred = predicts[:, best_index, :, :]
+        
         best_threshold = best_thresholds[best_index]
         best_prob_cloud = (predicts[:, best_index, :, :] > best_threshold).float().mean(dim=0)
         best_prob_cloud = best_prob_cloud
@@ -116,11 +118,21 @@ def calculate_prob_cloud(predicts: Tensor, future_labels: Tensor,
             np.savetxt(f"prob_cloud/train_best_true_labels_{i}.csv", best_true_labels.cpu().numpy(), delimiter=",")
             # np.savetxt(f"prob_cloud/train_best_history_{i}.csv", best_history.cpu().numpy(), delimiter=",")
             np.savetxt(f"prob_cloud/train_best_hist_labels_{i}.csv", best_hist_labels.cpu().numpy(), delimiter=",")
+            
+            if not os.path.exists(f"prob_cloud/train_best_pred_{i}"):
+                os.makedirs(f"prob_cloud/train_best_pred_{i}")
+            for j in range(20):
+                np.savetxt(f"prob_cloud/train_best_pred_{i}/train_best_pred_{i}_{j}.csv", best_pred[j].cpu().numpy(), delimiter=",")
         else:
             np.savetxt(f"prob_cloud/test_best_prob_cloud_{i}.csv", best_prob_cloud.cpu().numpy(), delimiter=",")
             np.savetxt(f"prob_cloud/test_best_true_labels_{i}.csv", best_true_labels.cpu().numpy(), delimiter=",")
             # np.savetxt(f"prob_cloud/test_best_history_{i}.csv", best_history.cpu().numpy(), delimiter=",")
             np.savetxt(f"prob_cloud/test_best_hist_labels_{i}.csv", best_hist_labels.cpu().numpy(), delimiter=",")
+            
+            if not os.path.exists(f"prob_cloud/test_best_pred_{i}"):
+                os.makedirs(f"prob_cloud/test_best_pred_{i}")
+            for j in range(20):
+                np.savetxt(f"prob_cloud/test_best_pred_{i}/test_best_pred_{i}_{j}.csv", best_pred[j].cpu().numpy(), delimiter=",")
     return best_10_index
     
 
