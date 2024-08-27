@@ -35,7 +35,7 @@ torch.multiprocessing.set_sharing_strategy('file_system')
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Set Denoising Diffusion Learning', add_help=False)
-    parser.add_argument('--device', default='cuda:0', help='device id (i.e. 0 or 0,1 or cpu)')
+    parser.add_argument('--device', default='cuda:1', help='device id (i.e. 0 or 0,1 or cpu)')
     parser.add_argument('--name', default='', help='renames results.txt to results_name.txt if supplied')
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--eval', action='store_true', help='only evaluate model on validation set')
