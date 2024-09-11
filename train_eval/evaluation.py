@@ -121,6 +121,7 @@ def calculate_prob_cloud(predicts: Tensor, future_labels: Tensor,
             
             if not os.path.exists(f"prob_cloud/train_best_pred_{i}"):
                 os.makedirs(f"prob_cloud/train_best_pred_{i}")
+            np.savetxt(f"prob_cloud/train_best_pred_{i}/train_best_threshold_{i}.csv", np.array([best_threshold]), delimiter=",")
             for j in range(20):
                 np.savetxt(f"prob_cloud/train_best_pred_{i}/train_best_pred_{i}_{j}.csv", best_pred[j].cpu().numpy(), delimiter=",")
         else:
@@ -131,6 +132,7 @@ def calculate_prob_cloud(predicts: Tensor, future_labels: Tensor,
             
             if not os.path.exists(f"prob_cloud/test_best_pred_{i}"):
                 os.makedirs(f"prob_cloud/test_best_pred_{i}")
+            np.savetxt(f"prob_cloud/test_best_pred_{i}/test_best_threshold_{i}.csv", np.array([best_threshold]), delimiter=",")
             for j in range(20):
                 np.savetxt(f"prob_cloud/test_best_pred_{i}/test_best_pred_{i}_{j}.csv", best_pred[j].cpu().numpy(), delimiter=",")
     return best_10_index

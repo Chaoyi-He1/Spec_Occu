@@ -706,8 +706,8 @@ class Special_case_multi_env(Dataset):
         for i, data_file_path in enumerate(self.data_files):
             print("Loading data from %s ... (%d / %d)" %
                   (data_file_path, i, len(self.data_files)))
-            # if i != 0:
-            #     continue
+            if i not in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]:
+                continue
 
             with h5py.File(data_file_path, 'r') as f:
                 data = self.h5py_to_dict(f)
@@ -728,7 +728,7 @@ class Special_case_multi_env(Dataset):
                 label, data_I, data_Q = [], [], []
                 for j in range(start_index.shape[0]):
                     # make the start index located randomly in the future_steps
-                    start_index[j] = start_index[j] - np.random.randint(0, self.future_steps) - self.past_steps
+                    start_index[j] = start_index[j] - np.random.randint(1, self.future_steps) - self.past_steps
                     # start_index[j] = start_index[j] - np.random.randint(int(self.future_steps / 4), int(3 * self.future_steps / 4)) - self.past_steps
                     label.append(data["label_frame"][start_index[j]:start_index[j] + self.total_time_steps, ...])
                     data_I.append(data["data_frame_I"][start_index[j]:start_index[j] + self.total_time_steps, ...])
